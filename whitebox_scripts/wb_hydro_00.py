@@ -1,11 +1,15 @@
 #! python3
 """
-:Date: 2020-03-19
+Updated: 2020-03-20
 
-From initial DEM and pipe files, create 3 new DSM groups:
+From initial DEM and extracted pipe files, create 3 new DSM groups:
 - DEM with culverts
 - DEM with breached depressions
 - DEM with culverts and breached depressions
+
+Quick & easy usage: to create all DSM groups, use:
+process_dems_00([list of paths to pipe files], dem_path)
+at line 271
 """
 
 
@@ -50,7 +54,6 @@ def new_group_00(source_path):
 
 def new_file_00(in_file_path, name, out_ext, out_grp_path=None):
     """
-    
     Parameters
     ----------
     in_file_path: string
@@ -60,7 +63,7 @@ def new_file_00(in_file_path, name, out_ext, out_grp_path=None):
     out_ext: string
         File extension for the output file. Example: "shp"
     out_grp_path: string
-        Path to output directory. If none given, same as input directory.
+        Path to output directory. If none given, uses input directory.
     """
 
     import os
@@ -89,16 +92,35 @@ def new_file_00(in_file_path, name, out_ext, out_grp_path=None):
     return out_file_path
 
 
+def check_exists_00(file_path):
+    """Check whether the file was actually created.
+    Parameters
+    ----------
+    file_path : str
+        Path to file that should have been created
+    """
+
+    from pathlib import Path
+
+    file = Path(file_path)
+    if file.exists():
+        return True
+    else:
+        return False
+
+
 def merge_pipes_00(in_pipe_paths):
-    """ Merge culvert features from multiple files
+    """ Merge culvert features from multiple files, save to a new Hydro_Route group
     Parameters
     ----------
     in_pipe_paths : list
-        List of pipe files to merge
+        List of pipe files to merge. Pipe files should already be clipped to basin extent.
+    Returns
+    -------
+        Path to merged pipe file, in new Hydro_Route group
     """
 
     from WBT.whitebox_tools import WhiteboxTools
-
     wbt = WhiteboxTools()
 
     out_group = new_group_00(in_pipe_paths[-1])
@@ -106,7 +128,10 @@ def merge_pipes_00(in_pipe_paths):
 
     wbt.merge_vectors(';'.join(in_pipe_paths), output_path)
 
-    return output_path
+    if check_exists_00(output_path):
+        return output_path
+    else:
+        return False
 
 
 def extend_pipes_00(in_pipe_path, dist='20.0'):
@@ -125,7 +150,10 @@ def extend_pipes_00(in_pipe_path, dist='20.0'):
     output_path = new_file_00(in_pipe_path, "XTPIPE", "shp")
     wbt.extend_vector_lines(in_pipe_path, output_path, dist)
 
-    return output_path
+    if check_exists_00(output_path):
+        return output_path
+    else:
+        return False
 
 
 def pipes_to_raster_00(in_pipe_path, in_dem_path):
@@ -136,6 +164,10 @@ def pipes_to_raster_00(in_pipe_path, in_dem_path):
         Path to the pipe file to buffer
     in_dem_path : str
         Path to the base DEM
+    Returns
+    -------
+    output_path : str
+        Path to the new raster file
     """
 
     from WBT.whitebox_tools import WhiteboxTools
@@ -146,11 +178,14 @@ def pipes_to_raster_00(in_pipe_path, in_dem_path):
     wbt.vector_lines_to_raster(in_pipe_path, output_path, field="FID", nodata=True,
                                base=in_dem_path)
 
-    return output_path
+    if check_exists_00(output_path):
+        return output_path
+    else:
+        return False
 
 
 def zone_min_00(in_dem_path, in_zones_path):
-    """
+    """Sets the value of cells covered by culvert zones to the minimum elevation within each zone.
     Parameters
     ----------
     in_dem_path : str
@@ -165,11 +200,15 @@ def zone_min_00(in_dem_path, in_zones_path):
     output_path = new_file_00(in_zones_path, "MIN", "tif")
     wbt.zonal_statistics(in_dem_path, in_zones_path, output_path, stat="minimum", out_table=None)
 
-    return output_path
+    if check_exists_00(output_path):
+        return output_path
+    else:
+        return False
 
 
 def burn_min_00(in_dem_path, in_zones_path):
-    """
+    """Creates a new DSM group with values from the culvert zones file where culverts exist and from the
+    original DEM file everywhere else.
     Parameters
     ----------
     in_dem_path : str
@@ -187,68 +226,47 @@ def burn_min_00(in_dem_path, in_zones_path):
     pos_path = new_file_00(in_dem_path, "POS", "tif", out_group)
     wbt.is_no_data(in_zones_path, pos_path)
 
-    new_dem_path = new_file_00(in_dem_path, "DEM", "tif", out_group)
+    output_path = new_file_00(in_dem_path, "DEM", "tif", out_group)
 
     inputs = "{};{}".format(in_zones_path, in_dem_path)
 
     # If position (isnodata) file = 0, use value from zones. If = 1, use value from dem.
-    wbt.pick_from_list(inputs, pos_path, new_dem_path)
+    wbt.pick_from_list(inputs, pos_path, output_path)
 
-    return new_dem_path
+    if check_exists_00(output_path):
+        return output_path
+    else:
+        return False
 
 
-def breach_depressions_00(in_dem_path, breach_dist):
-    """
+def breach_depressions_00(in_dem_path, breach_dist='20'):
+    """Runs whitebox breach_depressions_least_cost tool
     Parameters
     ----------
     in_dem_path : str
         Path to the DEM
     breach_dist : str
-        Max distance to breach
+        Max distance to breach, in feet.
     """
+
+    from pathlib import Path
 
     from WBT.whitebox_tools import WhiteboxTools
     wbt = WhiteboxTools()
 
     out_group = new_group_00(in_dem_path)
-    out_path = new_file_00(in_dem_path, "DEM", "tif", out_group)
+    output_path = new_file_00(in_dem_path, "DEM", "tif", out_group)
 
-    wbt.breach_depressions_least_cost(in_dem_path, out_path, breach_dist)
+    wbt.breach_depressions_least_cost(in_dem_path, output_path, breach_dist)
 
-
-# === Combined functions === #
-
-def process_pipe_vectors_00(in_pipe_paths, dist='20.0'):
-    """Merge pipe vector files and extend lines by dist from each end.
-    Parameters
-    ----------
-    in_pipe_paths : list
-        List of paths to pipe shapefiles
-    dist : str
-        Distance in feet to extend the pipe lines from each end.
-    """
-
-    merge = merge_pipes_00(in_pipe_paths)
-    extend = extend_pipes_00(merge, str(dist))
-
-    return extend
+    if check_exists_00(output_path):
+        return output_path
+    else:
+        return False
 
 
-def burn_culverts_00(in_pipe_path, in_dem_path):
-    """
-    Parameters
-    ----------
-    in_pipe_path : str
-        Path to pipe shapefile
-    in_dem_path : str
-        Path to input DEM file
-    """
 
-    pipe_ras = pipes_to_raster_00(in_pipe_path, in_dem_path)
-    min_zones = zone_min_00(in_dem_path, pipe_ras)
-    burn_dem = burn_min_00(in_dem_path, min_zones)
-
-    return burn_dem
+# === Run all functions === #
 
 
 def process_dems_00(in_pipe_paths, in_dem_path, extend_dist='20', breach_dist='50'):
@@ -261,7 +279,7 @@ def process_dems_00(in_pipe_paths, in_dem_path, extend_dist='20', breach_dist='5
     Parameters
     ----------
     in_pipe_paths : list
-        List of paths to pipe shapefiles
+        List of paths to pipe shapefiles (already clipped to basin extent)
     in_dem_path : str
         Path to initial DEM file
     extend_dist : str
@@ -271,18 +289,15 @@ def process_dems_00(in_pipe_paths, in_dem_path, extend_dist='20', breach_dist='5
     """
 
     # Add culverts
-    pipes = process_pipe_vectors_00(in_pipe_paths, str(extend_dist))
-    dem_01 = burn_culverts_00(pipes, in_dem_path)
+    merged_pipes = merge_pipes_00(in_pipe_paths)
+    extended_pipes = extend_pipes_00(merged_pipes, str(extend_dist))
+
+    pipe_raster = pipes_to_raster_00(extended_pipes, in_dem_path)
+    min_zones = zone_min_00(in_dem_path, pipe_raster)
+    culverts_dem = burn_min_00(in_dem_path, min_zones)
 
     # Breach depressions on original DEM file
     breach_depressions_00(in_dem_path, str(breach_dist))
 
     # Breach depressions on file with culverts
-    breach_depressions_00(dem_01, str(breach_dist))
-
-
-
-if __name__ == '__main__':
-    in_pipes = [r'C:\Users\betha\Work\Data\WBTEST00\Hydro_Route\HYDRTE00_NCDOT00\CHOWN05_PIPES00_NCDOT00_NNBIS.shp', r'C:\Users\betha\Work\Data\WBTEST00\Hydro_Route\HYDRTE01_NCDOT01\CHOWN05_PIPES01_NCDOT01_MNTNC.shp']
-    in_dem = r'C:\Users\betha\Work\Data\WBTEST00\Surface\DSM00_LDR2014\CHOWN05_DEM00_LDR2014_D20.tif'
-    process_dems_00(in_pipes, in_dem)
+    breach_depressions_00(culverts_dem, str(breach_dist))
