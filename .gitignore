@@ -1,6 +1,6 @@
 
 
-
+/.idea/
 
 
 # Temporary and binary files
@@ -30,7 +30,7 @@ __pycache__/*
 .settings
 .idea
 tags
-.spyproject
+/.spyproject/
 
 # Package files
 *.egg
