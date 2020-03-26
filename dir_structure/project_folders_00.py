@@ -5,49 +5,39 @@
 
 """
 
-#TODO: Rewrite these to use pathlib, clean up any unnecessary stuff, make them more versatile.
+# TODO: Rewrite these to use pathlib, clean up any unnecessary stuff, make them more versatile.
 
-def new_group_00(in_file_path):
-    """ Create the next group in the input file's class
+
+def new_group_00(group_parent_path, grp_str, source_str):
+    """
     Parameters
     ----------
-    in_file_path : str
-        Path to input file
-    source_name : str
-        (Optional) If different from the input file
+    group_parent_path : str
+    grp_str : str
+    source_str : str
     """
 
-    import os
     from pathlib import Path
-    import re
 
-    in_file_name = os.path.basename(in_file_path)
-    source_str = in_file_name.split("_")[1]
-    source_str = source_str[:-2]
+    group_parent = Path(group_parent_path)
 
-    in_grp_path = os.path.dirname(in_file_path)
-    in_grp_parent = os.path.dirname(in_grp_path)
+    grps = group_parent.glob(grp_str + '*')  # TODO: Make this a list comprehension, filter to only dirs
 
-    grpRegex = re.compile(r'(\w{2,8})(\d{2})_(\w{2,9})$')
-    mo = grpRegex.search(re.escape(in_grp_path))
-    grp_name = mo.group(1)
-    in_grpno = mo.group(2)
+    if grps:
+        grp_nos = []
+        for grp in grps:  # TODO: Make this a list comprehension
+            grp_no = grp.name.split("_")[0][-2:]
+            grp_nos.append(int(grp_no))
 
-    grps = os.listdir(in_grp_parent)
+        new_grp_no = ('0' + str(max(grp_nos) + 1))[-2:]
+    else:
+        new_grp_no = '00'
 
-    # TODO: Replace this with a list comprehension
-    grpnos = []
-    for g in grps:
-        new_mo = grpRegex.search(g)
-        grpno = new_mo.group(2)
-        grpnos.append(int(grpno))
+    new_group = group_parent.joinpath("{}{}_{}".format(grp_str, new_grp_no, source_str))
 
-    out_grpno = ('0' + str(max(grpnos) + 1))[-2:]
-    out_grp = "{}{}_{}{}".format(grp_name, out_grpno, source_str, in_grpno)
-    out_grp_path = os.path.join(in_grp_parent, out_grp)
-    os.mkdir(out_grp_path)
+    Path.mkdir(new_group)
 
-    return out_grp_path
+    return new_group
 
 
 def out_file_00(in_file_path, name, out_ext, out_grp_path=None):
@@ -65,32 +55,25 @@ def out_file_00(in_file_path, name, out_ext, out_grp_path=None):
         Path to output directory. If none given, same as input directory.
     """
 
-    import os
-    import re
+    from pathlib import Path
 
-    in_file_name = os.path.basename(in_file_path)
-    in_grp_path = os.path.dirname(in_file_path)
+    in_file = Path(in_file_path)
+    in_grp = in_file.parent
 
-    fileRegex = re.compile(r'(\w{2,9}\d{2})_(\w{2,9})(\d{2})_\w{2,12}_?\w*\.\w{1,5}')
-    mo = fileRegex.search(in_file_name)
-    huc = mo.group(1)
-    source_name = mo.group(2)
-    in_grpno = mo.group(3)
+    name_strings = in_file.name.split("_")
+    huc = name_strings[0]
+    source_name = name_strings[1][:-2]
+    in_grpno = name_strings[1][-2:]
 
     if out_grp_path is not None:
-        grpnoRegex = re.compile(r'(\w{2,9})(\d{2})_\w{2,9}$')
-        grp_mo = grpnoRegex.search(out_grp_path)
-        out_grpno = grp_mo.group(2)
+        out_grp = Path(out_grp_path)
+        out_grpno = out_grp.name.split("_")[0][-2:]
+
     else:
-        out_grp_path = in_grp_path
+        out_grp = in_grp
         out_grpno = in_grpno
 
     out_file_name = "{}_{}{}_{}{}.{}".format(huc, name, out_grpno, source_name, in_grpno, out_ext)
-    out_file_path = os.path.join(out_grp_path, out_file_name)
+    out_file_path = out_grp.joinpath(out_file_name)
 
     return out_file_path
-
-
-
-
-

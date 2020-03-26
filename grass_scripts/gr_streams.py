@@ -42,75 +42,109 @@ def grass_setup_00(gisdb, location, mapset='PERMANENT'):
     gisbase = out.strip(os.linesep)
 
     # set GISBASE environment variable
-    os.environ['GISBASE'] = gisbase
+    os.environ['GISBASE'] = gisdb
 
     # define GRASS-Python environment
-    grass_pydir = os.path.join(gisbase, "etc", "python")
+    grass_pydir = os.path.join(gisdb, "etc", "python")
     sys.path.append(grass_pydir)
 
     # Import GRASS Python bindings
-    import grass.script as gscript
+    import grass.script as gs
 
     # Launch session
-    rcfile = gscript.setup.init(gisbase, gisdb, location, mapset)
+    rcfile = gs.setup.init(gisbase, gisdb, location, mapset)
 
-    # Example calls
-    gscript.message('Current GRASS GIS 7 environment:')
-    print(gscript.gisenv())
+    # # Example calls
+    # gs.message('Current GRASS GIS 7 environment:')
+    # print(gs.gisenv())
+    #
+    # gs.message('Available raster maps:')
+    # for rast in gs.list_strings(type='raster'):
+    #     print(rast)
+    #
+    # gs.message('Available vector maps:')
+    # for vect in gs.list_strings(type='vector'):
+    #     print(vect)
 
-    gscript.message('Available raster maps:')
-    for rast in gscript.list_strings(type='raster'):
-        print(rast)
 
-    gscript.message('Available vector maps:')
-    for vect in gscript.list_strings(type='vector'):
-        print(vect)
-
-
-def import_dem_00(in_dem_path):
+def import_dem_00(dem_path):
     """
 
     Parameters
     ----------
-    in_dem_path : str
+    dem_path : str
         Path to the DEM
 
     Returns
     -------
-    in_raster : str
+    out_raster : str
         Name of the imported raster
     """
     import os
 
-    import grass.script as gscript
+    import grass.script as gs
 
-    out_raster = '_'.join(os.path.basename(in_dem_path).split('_')[0:2])
+    out_raster = '_'.join(os.path.basename(dem_path).split('_')[0:2])
 
-    gscript.run_command('r.in.gdal', input=in_dem_path, output=out_raster)
+    # Import DEM
+    gs.run_command('r.in.gdal', input=dem_path, output=out_raster)
+
+    # Set computational region
+    gs.run_command('g.region', raster=out_raster)
 
     return out_raster
 
 
-def export_raster_00(in_raster, name, prj_path):
+def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
     """
 
     Parameters
     ----------
     in_raster : str
         Name of GRASS raster to export
+    group_parent_name : str
+        Name of class, example: "Surface_Flow"
+    group_str : str
+        Group prefix, example: "SFW"
     name : str
-        Model file abbreviation
-    out_dir : str
-        Path to output group directory
+        Model file abbreviation, example: "P"
+    dem_path : str
+        Path to DEM
     """
-    # TODO: Write function to export the raster to a geotiff file.
 
-    import pathlib
+    from pathlib import Path
 
-    if name == 'SRC':
+    import grass.script as gs
 
-    elif name == 'P':
+    dem = Path(dem_path)
+    dsm = dem.parent
+    prj = dsm.parent.parent
 
+    group_parent_path = prj.joinpath(group_parent_name)
+
+    grps = group_parent_path.glob(group_str + '*')
+
+    if grps:
+        grpnos = []
+        for grp in grps:
+            grpno = grp.name.split("_")[0][:-2]
+            grpnos.append(int(grpno))
+        new_group_no = ('0' + str(max(grpnos) + 1))[-2:]
+    else:
+        new_group_no = '00'
+
+    new_group = group_parent_path.joinpath(group_str + new_group_no)
+    Path.mkdir(new_group)
+
+    # Export file path
+    out_file_name = "{}{}_{}.tif".format(name, new_group_no, dem.name.split("_")[1])
+    out_path = new_group.joinpath(out_file_name)
+
+    # CLI command: r.out.gdal -c --overwrite input=in_raster
+    # output=out_path format=GTiff type=Int16
+    # createopt=COMPRESS=LZW,PREDICTOR=2,BIGTIFF=YES nodata=-32768
+
+    gs.run_command('r.out.gdal', input=in_raster, output=out_path, format="GTiff", type="Int16", createopt="COMPRESS=LZW,PREDICTOR=2,BIGTIFF=YES", nodata=-32768)
 
 
 def watershed_00(in_raster_name, threshold):
@@ -129,6 +163,8 @@ def watershed_00(in_raster_name, threshold):
         Output rasters {type: name}
     """
 
+    import grass.script as gs
+
     huc = in_raster_name.split('_')[0]
     num = in_raster_name[-2:]
 
@@ -144,11 +180,8 @@ def watershed_00(in_raster_name, threshold):
             'slope_steepness': "{h}_slpstp_{n}".format(h=huc, n=num)
     }
 
-    # TODO: Run r.watershed. console command: r.watershed elevation=CHOWN05_DEM01@PERMANENT threshold=100
-    #  accumulation=CHOWN05_acc tci=CHOWN05_tci spi=CHOWN05_spi drainage=CHOWN05_drain basin=CHOWN05_basin
-    #  stream=CHOWN05_stream length_slope=CHOWN05_slplen slope_steepness=CHOWN05_slpstp
 
-    gscript.run_command('r.watershed', input=in_raster_name, threshold=threshold, **watershed_rasters)
+    gs.run_command('r.watershed', input=in_raster_name, threshold=threshold, **watershed_rasters)
 
     return watershed_rasters
 
@@ -165,44 +198,52 @@ def watershed_00(in_raster_name, threshold):
 ##################################################################################
 
 
-def drain_to_p_00(in_raster):
+def drain_to_p_00(in_raster, dem):
     """Converts a drainage direction file produced by r.watershed for use by TauDem.
 
     Parameters
     ----------
     in_raster : str
         Name of GRASS drainage direction raster
-    """
+    dem : str or obj
 
+    """
+    import pathlib.Path
+
+    import grass.script as gs
 
     out_raster = in_raster.replace('drain', 'flowdir')
-    # If drain < 1: td = 0. Elif drain = 8: td = 1. Else: td = drain + 1
 
     expr = "{o} = if({i}<1, null(), if({i}==8, 1, {i}+1))".format(o=out_raster, i=in_raster)
 
-    script.raster.mapcalc(expr)
+    gs.raster.mapcalc(expr)
 
-    export_raster_00(out_raster, 'P')
+    export_raster_00(out_raster, 'Surface_Flow', 'SFW', 'P', dem)
 
-def stream_to_src_00(stream):
+
+def stream_to_src_00(stream, dem):
     """
 
     Parameters
     ----------
-    stream :
-
-    Returns
-    -------
-
+    dem : str or obj
+        Path to DEM file
+    stream : str
+        Name of GRASS stream raster
     """
+
+
+
+
 
     out_raster = stream.replace('stream', 'str-src')
 
     # All non-zero values to 1
     expr = '{o} = if({i}, 1, null())'.format(o=out_raster, i=stream)
-    script.raster.mapcalc(expr)
+    gs.raster.mapcalc(expr)
 
-    export_raster_00(out_raster, 'SRC')  # Might need to add more parameters here to get the right file formats
+
+    export_raster_00(out_raster, 'Stream_Pres', 'STPRES', 'SRC', dem)
 
 
 def watershed_batch_00(dem_path, grass_db_folder, grass_location, grass_mapset, min_basin_size=100):
@@ -232,8 +273,8 @@ def watershed_batch_00(dem_path, grass_db_folder, grass_location, grass_mapset, 
     drain = watershed_rasters['drain']
 
     # Reclassify and export GRASS rasters for use with TauDEM
-    stream_to_src_00(stream)
-    drain_to_p_00(drain)
+    stream_to_src_00(stream, dem_path)
+    drain_to_p_00(drain, dem_path)
 
     ########### Copied
     # Clean up at the end
