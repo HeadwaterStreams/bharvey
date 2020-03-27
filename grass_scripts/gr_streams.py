@@ -212,9 +212,9 @@ def drain_to_p_00(in_raster, dem):
 
     import grass.script as gs
 
-    out_raster = in_raster.replace('drain', 'flowdir')
+    out_raster = in_raster.replace("drain", "drain-p")
 
-    expr = "{o} = if({i}<1, null(), if({i}==8, 1, {i}+1))".format(o=out_raster, i=in_raster)
+    expr = "{o} = if( {i}>=1, if({i}==8, 1, {i}+1), null() )".format(o=out_raster, i=in_raster)
 
     gs.raster.mapcalc(expr)
 
@@ -236,10 +236,10 @@ def stream_to_src_00(stream, dem):
 
 
 
-    out_raster = stream.replace('stream', 'str-src')
+    out_raster = stream.replace("stream", "str-src")
 
     # All non-zero values to 1
-    expr = '{o} = if({i}, 1, null())'.format(o=out_raster, i=stream)
+    expr = "{o} = if(isnull({i}), 0, 1)".format(o=out_raster, i=stream)
     gs.raster.mapcalc(expr)
 
 
