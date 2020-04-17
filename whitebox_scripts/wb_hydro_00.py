@@ -218,7 +218,8 @@ def merge_pipes_00(in_pipe_paths):
     
     last_pipe = Path(in_pipe_paths[-1])
     
-    out_group = new_group_01(str(last_pipe.parent), last_pipe.stem.split('_')[
+    out_group = new_group_01(str(last_pipe.parent.parent), last_pipe.stem.split(
+        '_')[
         1], "PIPES")
     output_path = new_file_00(str(last_pipe), "PIPES", "shp",
                               str(out_group))
