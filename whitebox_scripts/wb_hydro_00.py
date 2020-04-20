@@ -353,7 +353,7 @@ def breach_depressions_00(in_dem_path, breach_dist='20'):
     in_dem_path : str
         Path to the DEM
     breach_dist : str
-        Max distance to breach, in feet.
+        Search radius
     """
     
     from WBT.whitebox_tools import WhiteboxTools
@@ -363,7 +363,9 @@ def breach_depressions_00(in_dem_path, breach_dist='20'):
     out_group = new_group_00(in_dem_path)
     output_path = new_file_00(in_dem_path, "DEM", "tif", out_group)
     
-    wbt.breach_depressions_least_cost(in_dem_path, output_path, breach_dist)
+    wbt.breach_depressions_least_cost(in_dem_path, output_path, breach_dist,
+                                      fill=True)
+    # TODO: add max_cost parameter for DEMs with quarries
     
     if check_exists_00(output_path):
         return output_path
@@ -372,67 +374,100 @@ def breach_depressions_00(in_dem_path, breach_dist='20'):
 
 
 # Testing
-def fill_zones_00(old_dem, new_dem):
-    """Create fill zone polygons
+def fill_and_breach_zones_00(old_dem, new_dem, min_depth=0.1):
+    """Create polygons for fill zones and breaches
+     Compares original vs post-breach-depressions DEM elevations. For any
+     cells where the difference exceeds min_depth, a polygon is
+     created.
 
     Parameters
     ----------
-    old_dem : str or obj
+    old_dem : str or object
         Path to original DEM
-    new_dem : str or obj
+    new_dem : str or object
         Path to new DEM created with breach_depressions
+    min_depth : float or str
+        Minimum difference between DEMs, in feet
     """
     from WBT.whitebox_tools import WhiteboxTools
     wbt = WhiteboxTools()
-   
-    diff = new_file_00(new_dem, 'FDIFF', 'tif')
-    wbt.subtract(new_dem, old_dem, diff)
+
+    # Create difference raster
+    diff = new_file_00(new_dem, 'DIFF', 'tif')
+    wbt.subtract(str(new_dem), str(old_dem), diff)
     
-    # Reclass (everything not 0 or nodata = 1)
-    zones = new_file_00(diff, 'FZ', 'tif')
-    wbt.greater_than(diff, '0', zones)
-    
+    # Create a patch mask file
+    fill_cells = new_file_00(diff, 'FCEL', 'tif')
+    f_patch_vals = '0;min;{d};1;{d};max'.format(d=min_depth)
+    wbt.reclass(diff, fill_cells, f_patch_vals)
+
+    # Clump contiguous cells
+    fill_clumps = new_file_00(fill_cells, 'FCLMP', 'tif')
+    wbt.clump(fill_cells, fill_clumps, diag=True, zero_back=True)
+
+    # Find area of clumps
+    clump_area = new_file_00(fill_clumps, 'FAREA', 'tif')
+    wbt.raster_area(fill_clumps, clump_area, out_text=False, units="grid cells",
+                    zero_back=True)
+    # Remove single-cell clumps
+    multi_cell = new_file_00(clump_area, 'FPTCH', 'tif')
+    patch_area_vals = '0;min;2;1;2;max'
+    wbt.reclass(clump_area, multi_cell, patch_area_vals)
+    wbt.modify_no_data_value(multi_cell, "0")
+
+    # Clump contiguous cells again
+    fill_zones = new_file_00(multi_cell, 'FZ', 'tif')
+    wbt.clump(multi_cell, fill_zones, diag=True, zero_back=True)
+
     # Zonal stats
     means = new_file_00(diff, 'FMEAN', 'tif')
-    wbt.zonal_statistics(diff, zones, means, stat="mean")
+    wbt.zonal_statistics(diff, fill_zones, means, stat="mean")
 
     # Raster to polygon
     fill_poly = new_file_00(means, 'FP', 'shp')
     wbt.raster_to_vector_polygons(means, fill_poly)
+    # Add area field
+    wbt.polygon_area(fill_poly)
+
+    # # Create a breach zone file with 0 and 1 values
+    # breach_cells = new_file_00(diff, 'BCEL', 'tif')
+    # wbt.less_than(diff, '-0.1', breach_cells, incl_equals=True)
+    # wbt.modify_no_data_value(breach_cells, new_value="0")
 
 
 # Testing
-def find_breach_00(old_dem, new_dem):
-    """
-
-    Parameters
-    ----------
-    old_dem :
-    new_dem :
-    """
-    from WBT.whitebox_tools import WhiteboxTools
-
-    wbt = WhiteboxTools()
-
-    diff = new_file_00(new_dem, 'BDIF', 'tif')
-    wbt.subtract(old_dem, new_dem, diff)
-
-    # Reclass (everything not 0 or nodata = 1)
-    zones = new_file_00(diff, 'BZ', 'tif')
-    wbt.greater_than(diff, '0', zones)
-
-    # Zonal stats
-    means = new_file_00(diff, 'BMEAN', 'tif')
-    wbt.zonal_statistics(diff, zones, means, stat="mean")
-
-    # Raster to polygon
-    breach_poly = new_file_00(means, 'BP', 'shp')
-    wbt.raster_to_vector_polygons(means, breach_poly)
+# def find_breach_00(old_dem, new_dem):
+#     """
+#
+#     Parameters
+#     ----------
+#     old_dem :
+#     new_dem :
+#     """
+#     from WBT.whitebox_tools import WhiteboxTools
+#
+#     wbt = WhiteboxTools()
+#
+#     diff = new_file_00(new_dem, 'BDIF', 'tif')
+#     wbt.subtract(old_dem, new_dem, diff)
+#
+#     # Reclass (everything not 0 or nodata = 1)
+#     zones = new_file_00(diff, 'BZ', 'tif')
+#     wbt.greater_than(diff, '0', zones)
+#
+#     # Zonal stats
+#     means = new_file_00(diff, 'BMEAN', 'tif')
+#     wbt.zonal_statistics(diff, zones, means, stat="mean")
+#
+#     # Raster to polygon
+#     breach_poly = new_file_00(means, 'BP', 'shp')
+#     wbt.raster_to_vector_polygons(means, breach_poly)
     
 
 
-##############################
-# === Combined functions === #
+#########################################################################
+# === Combined functions ===
+
 
 def process_culverts_00(culvert_paths, in_dem_path, extend_dist='20'):
     """
