@@ -230,14 +230,16 @@ def stream_net_00(fel_path, p_path, ad8_path, src_path):
     huc = name_strings[0]
 
     sn_parent = prj / "Stream_Net"
-    snet_grp = pf.new_group_00(sn_parent, "SNET", src_str)
+    sn_parent.mkdir(parents=True, exist_ok=True)
+    snet_grp = Path(str(pf.new_group_00(sn_parent, "SNET", src_str)))
     snet_grpno = snet_grp.name.split("_")[0][-2:]
-    snet_grp.mkdir(parents=True)
+    snet_grp.mkdir(parents=True, exist_ok=True)
 
     bsn_parent = prj / "Basins"
-    bsn_grp = pf.new_group_00(bsn_parent, "BSN", src_str)
+    bsn_parent.mkdir(parents=True, exist_ok=True)
+    bsn_grp = Path(str(pf.new_group_00(bsn_parent, "BSN", src_str)))
     bsn_grpno = bsn_grp.name.split("_")[0][-2:]
-    bsn_grp.mkdir(parents=True)
+    bsn_grp.mkdir(parents=True, exist_ok=True)
 
     # Name output files
     ord_name = "{h}_ORD{g}_{s}.tif".format(h=huc, g=snet_grpno, s=src_str)
