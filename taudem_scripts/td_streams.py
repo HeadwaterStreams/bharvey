@@ -190,7 +190,7 @@ def threshold_00(ssa_path, threshold):
     source_str = name_strings[1]
     huc = name_strings[0]
 
-    group = pf.new_group_00(sp, "STPRES", source_str)
+    group = Path(str(pf.new_group_00(sp, "STPRES", source_str)))
 
     new_grpno = group.name.split("_")[0][-2:]
     src_name = "{h}_SRC{g}_{s}.tif".format(h=huc, g=new_grpno, s=source_str)
