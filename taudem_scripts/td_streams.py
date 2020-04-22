@@ -35,7 +35,7 @@ def pit_remove_00(dem_path):
     name_strings = dem.stem.split("_")
     in_group_num = name_strings[1][-2:]
     fel = dem.parent.parent.parent / "Surface_Flow" / "SFW{n}_DSM{n}".format(n=in_group_num) / "{h}_FEL{n}_{d}.tif".format(h=name_strings[0], n=in_group_num, d=name_strings[1])
-    fel.parent.mkdir(parents=True)
+    fel.parent.mkdir(parents=True, exist_ok=True)
     td_args.extend(["-fel", str(fel)])
 
     td_cmd_00(td_args)
@@ -273,7 +273,7 @@ def inverse_plan_to_snet_00(invplan_path, threshold, fel, p, d8, src):  # FIXME
 
     """
 
-    src = threshold_00(str(invplan_path), str(threshold))
+    src = threshold_00(str(invplan_path), threshold)
     rch = stream_net_00(str(fel), str(p), str(d8), str(src))
 
 
