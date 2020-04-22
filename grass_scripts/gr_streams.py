@@ -20,26 +20,18 @@
 #% description: Absolute path to the DEM
 #%end
 #%option
-#% key: resolution
-#% type: integer
-#% label: Resolution of the input raster file
-#% description: Length of a raster cell, in feet. Ex: 20, 10, 5...
-#% multiple: no
-#%end
-#%option
 #% key: threshold
 #% type: integer
-#% label: Minimum size of exterior watershed basin
-#% description: Min basin size, in cells. Leave blank to select automatically.
+#% label: Minimum size of exterior watershed basins, in cells.
+#% description: Depends on resolution. Ex: 20ft: 100, 10ft: 500, 5ft: 1200
 #% multiple: no
-#%end
-#%rules
-#% required: resolution,threshold
+#% required: yes
 #%end
 
 """
-main() skips the setup functions and must be run from within the GRASS user
-interface. To use from outside of GRASS, run watershed_batch_00() instead.
+..note::
+    main() skips the setup functions and must be run from within the GRASS user
+    interface.
 """
 
 
@@ -51,7 +43,7 @@ import grass.script as gscript
 
 ##############################################################
 # Setup Functions
-# Skip if running from within GRASS
+# Skipped if running from within GRASS
 # None of these work yet
 ##############################################################
 
@@ -98,53 +90,53 @@ def grass_environment_00(grass_bin=r'C:\Program Files\GRASS GIS 7.8\grass78.bat'
     return gisbase
 
 
-def open_location_00(dem_path, gisdb):
-    """Open or create a location and mapset
-    
-    GRASS directory structure is gisdb/location/mapset.
-
-    Parameters
-    ----------
-    dem_path : str
-        Path to DEM tif file to import. Extent and resolution of the
-        location will be based on it.
-    gisdb : str
-        Path to root GRASS project folder.
-
-    Returns
-    -------
-
-    """
-    import subprocess
-    from pathlib import Path
-    
-    gisbase = grass_environment_00()
-
-    grass = "grass78"  #TODO: Replace with search to find GRASS version.
-    
-    dem = Path(str(dem_path))
-    db = Path(str(gisdb))
-    
-    # Create location name from dem name
-    location_name = dem.name.split('_')[0]
-    location_path = db.joinpath(location_name)
-    
-    # Create mapset name from dem name
-    mapset_name = dem.name.split('_')[1]
-    mapset_path = location_path.joinpath(mapset_name)
-    
-    if not mapset_path.exists():
-        # Start GRASS, create the new mapset (and location if needed)
-        grass_cmd = [grass, "-c", dem_path, "{l}/{m}".format(l=location_path,
-                                                            m=mapset_name)]
-        subprocess.call(grass_cmd)
-        
-    # Import GRASS Python bindings
-    #import grass.script as gscript
-    from grass.script import setup as gsetup
-
-    # Launch session
-    rcfile = gsetup.init(gisbase, gisdb, location_path, mapset_name)
+# def open_location_00(dem_path, gisdb):
+#     """Open or create a location and mapset
+#
+#     GRASS directory structure is gisdb/location/mapset.
+#
+#     Parameters
+#     ----------
+#     dem_path : str
+#         Path to DEM tif file to import. Extent and resolution of the
+#         location will be based on it.
+#     gisdb : str
+#         Path to root GRASS project folder.
+#
+#     Returns
+#     -------
+#
+#     """
+#     import subprocess
+#     from pathlib import Path
+#
+#     gisbase = grass_environment_00()
+#
+#     grass = "grass78"  #TODO: Replace with search to find GRASS version.
+#
+#     dem = Path(str(dem_path))
+#     db = Path(str(gisdb))
+#
+#     # Create location name from dem name
+#     location_name = dem.name.split('_')[0]
+#     location_path = db.joinpath(location_name)
+#
+#     # Create mapset name from dem name
+#     mapset_name = dem.name.split('_')[1]
+#     mapset_path = location_path.joinpath(mapset_name)
+#
+#     if not mapset_path.exists():
+#         # Start GRASS, create the new mapset (and location if needed)
+#         grass_cmd = [grass, "-c", dem_path, "{l}/{m}".format(l=location_path,
+#                                                             m=mapset_name)]
+#         subprocess.call(grass_cmd)
+#
+#     # Import GRASS Python bindings
+#     #import grass.script as gscript
+#     from grass.script import setup as gsetup
+#
+#     # Launch session
+#     rcfile = gsetup.init(gisbase, gisdb, location_path, mapset_name)
 
 
 def grass_setup_00(gisdb, location):
@@ -214,6 +206,11 @@ def grass_stop_00():
     # gsetup.cleanup()
 
 
+def new_location_00(dem_path, gisdb):
+    """Create a new location based on the DEM"""
+    pass
+
+
 ##############################################################
 # GRASS tools
 # These work if run from inside GRASS
@@ -237,13 +234,9 @@ def import_dem_00(dem_path):
     name_parts = Path(str(dem_path)).name.split('_')
     out_raster = '_'.join(name_parts[0:2])
 
-    # Import the DEM if it hasn't already been imported
-    # It would probably be easier to add --overwrite?
-    # try:
+    # Import the DEM
     gscript.run_command('r.in.gdal', input=str(dem_path),
                             output=out_raster, overwrite=True)
-    # except CalledModuleError:
-    #     pass
 
     # Set computational region
     gscript.run_command('g.region', raster=out_raster)
@@ -251,30 +244,49 @@ def import_dem_00(dem_path):
     return out_raster
 
 
-def watershed_00(in_raster_name, resolution, threshold=None):
+def get_threshold_00(resolution):
+    """Minimum basin size, based on resolution.
+
+    Provides a reasonable minimum basin size for the resolution of the file.
+    It is a rough estimate that will be more appropriate for some regions than others.
+
+    ..note::
+        This does NOT work when the module is run from within GRASS.
+
+    Parameters
+    ----------
+    resolution : int
+        Resolution of the input DEM
+
+    Returns
+    -------
+    threshold : int
+        Value for minimum basin size, based on resolution
+    """
+    thresholds = {'20': 100, '10': 500, '5': 1200}
+
+    if str(resolution) in thresholds.keys():
+        threshold = thresholds[str(resolution)]
+        return threshold
+    else:
+        return "Minimum basin size required"
+
+
+def watershed_00(in_raster_name, threshold):
     """Run r.watershed
 
     Parameters
     ----------
     in_raster_name : str
         Name of imported dem file
-    resolution : int
-        Size of a map cell.
     threshold : int
-        (Optional) Minimum size, in map cells, of individual watersheds. If
+        Minimum size, in map cells, of individual watersheds. If
         not specified, choose based on resolution.
 
     Returns
     -------
     watershed_rasters : dict
-        Output rasters {type: name}
     """
-
-    thresholds = {
-        '20': 100,
-        '10': 500,
-        '5': 1200,
-    }
 
     huc = in_raster_name.split('_')[0]
     num = in_raster_name[-2:]
@@ -292,13 +304,6 @@ def watershed_00(in_raster_name, resolution, threshold=None):
         'slope_steepness': "{h}_slpstp_{n}".format(h=huc, n=num)
     }
 
-    # Get threshold
-    if threshold is None:
-        if str(resolution) in thresholds.keys():
-            threshold = thresholds[str(resolution)]
-        else:
-            threshold = 100
-
     gscript.core.run_command('r.watershed', threshold=threshold, overwrite=True,
                              **watershed_rasters)
 
@@ -306,18 +311,16 @@ def watershed_00(in_raster_name, resolution, threshold=None):
 
 
 def drain_to_p_00(in_raster, dem):
-    """Convert a drainage direction file produced by r.watershed for use by
-    TauDem.
+    """Convert a drainage direction raster to P file
 
     Parameters
     ----------
     in_raster : str
         Name of GRASS drainage direction raster
     dem : str
-
     """
 
-    out_raster = in_raster.replace("drain", "drainp")
+    out_raster = in_raster.replace("drain", "p")
 
     expr = "{o} = if( {i}>=1, if({i}==8, 1, {i}+1), null() )".format(
         o=out_raster, i=in_raster)
@@ -329,21 +332,21 @@ def drain_to_p_00(in_raster, dem):
     return p_path
 
 
-def stream_to_src_00(stream, dem):
-    """
+def stream_to_src_00(in_raster, dem):
+    """Convert a stream segments raster to SRC file
 
     Parameters
     ----------
     dem : str or obj
         Path to DEM file
-    stream : str
+    in_raster : str
         Name of GRASS stream raster
     """
 
-    out_raster = stream.replace("stream", "strsrc")
+    out_raster = in_raster.replace('stream', 'src')
 
     # All non-zero values to 1
-    expr = "{o} = if(isnull({i}), 0, 1)".format(o=out_raster, i=stream)
+    expr = "{o} = if(isnull({i}), 0, 1)".format(o=out_raster, i=in_raster)
     gscript.raster.mapcalc(expr, overwrite=True)
 
     src_path = export_raster_00(out_raster, 'Stream_Pres', 'STPRES', 'SRC', dem)
@@ -352,7 +355,7 @@ def stream_to_src_00(stream, dem):
 
 
 def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
-    """
+    """Export GRASS rasters to .tif files
 
     Parameters
     ----------
@@ -372,7 +375,9 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
     dsm = dem.parent
     prj = dsm.parent.parent
 
-    group_parent_path = prj.joinpath(group_parent_name)
+    huc = dem.stem.split('_')[0]
+
+    group_parent_path = prj / group_parent_name
 
     grps = group_parent_path.glob(group_str + '*')
 
@@ -384,12 +389,12 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
         new_group_no = ('0' + str(max(grpnos) + 1))[-2:]
     else:
         new_group_no = '00'
-
-    new_group = group_parent_path.joinpath(group_str + new_group_no)
+    old_group = dsm.name.split('_')[0]
+    new_group = group_parent_path / "{}{}_{}".format(group_str, new_group_no, old_group)
     Path.mkdir(new_group)
 
     # Export file path
-    out_file_name = "{}{}_{}.tif".format(name, new_group_no,
+    out_file_name = "{}_{}{}_{}.tif".format(huc, name, new_group_no,
                                          dem.name.split("_")[1])
     out_path = new_group.joinpath(out_file_name)
 
@@ -404,15 +409,14 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
 # Combined functions
 ##################################
 
-def dem_to_src_and_p(dem_path, resolution, threshold=None):
+
+def dem_to_src_and_p(dem_path, threshold):
     """Run import, watershed, mapcalc, and export tools
 
     Parameters
     ----------
     dem_path : str or object
         Path to DEM file
-    resolution : int
-        Length of a DEM cell, in ft
     threshold : int
         Minimum size of watershed basin.
 
@@ -426,8 +430,8 @@ def dem_to_src_and_p(dem_path, resolution, threshold=None):
     # Import dem
     elev_raster = import_dem_00(str(dem_path))
 
-    # Run watershed tool
-    watershed_rasters = watershed_00(str(elev_raster), resolution, threshold)
+    # Run r.watershed
+    watershed_rasters = watershed_00(str(elev_raster), threshold)
     stream = watershed_rasters['stream']
     drain = watershed_rasters['drainage']
 
@@ -440,9 +444,10 @@ def dem_to_src_and_p(dem_path, resolution, threshold=None):
 
     return output_paths
 
+
 def watershed_batch_00(dem_paths, grass_db_folder, resolution,
-                       threshold=None): #FIXME
-    """
+                       min_basin_size=None): #FIXME
+    """Create P and SRC files for a list of DEMs
 
     Parameters
     ----------
@@ -452,25 +457,18 @@ def watershed_batch_00(dem_paths, grass_db_folder, resolution,
         Path to the root directory to store the GRASS files
     resolution : int
         Length of a raster cell, in feet
-    threshold : int
+    min_basin_size : int
         (Optional) Watershed basin minimum size, in cells
     """
     import grass.script as gscript
 
     grass_start_00()
 
+    if min_basin_size is None:
+        min_basin_size = get_threshold_00(resolution)
+
     for dem in dem_paths:
-        # Import DEM, creating a new location for each
-        elev_raster = import_dem_00(str(dem))
-
-        # Run watershed tool
-        watershed_rasters = watershed_00(str(elev_raster), resolution, threshold)
-        stream = watershed_rasters['stream']
-        drain = watershed_rasters['drain']
-
-        # Reclassify and export GRASS rasters for use with TauDEM
-        stream_to_src_00(stream, dem)
-        drain_to_p_00(drain, dem)
+        dem_to_src_and_p(dem, min_basin_size)
 
     # Clean up temporary files and exit
     grass_stop_00()
@@ -484,10 +482,9 @@ def main():
 
     options, flags = gscript.parser()
     dem_path = options['dem_path']
-    resolution = options['resolution']
     threshold = options['threshold']
 
-    dem_to_src_and_p(dem_path, resolution, threshold)
+    dem_to_src_and_p(dem_path, threshold)
 
     return 0
 
