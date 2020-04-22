@@ -87,29 +87,3 @@ def new_file_00(in_file_path, name=None, out_ext=None, out_grp_path=None):
     
     return out_file
 
-
-class File:
-    
-    def __init__(self, file_path):
-        """Parse file name
-        
-        Parameters
-        ----------
-        file_path : str
-        """
-        from pathlib import Path
-        
-        file = Path(file_path)
-        name_strings = file.stem.split("_")
-        self.huc = name_strings[0]
-        self.str = name_strings[1]
-        self.typ = self.str[:-2]
-        self.num = self.str[-2:]
-        self.src = name_strings[2]
-        self.ext = file.suffix
-        
-        self.grp = file.parent
-        self.cls = self.grp.parent
-        self.prj = self.cls.parent
-
-
