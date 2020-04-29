@@ -1,35 +1,32 @@
 #!/usr/bin/env python3
 #################################################################################
 #
-# MODULE:     gr_streams
+# MODULE:     gr_watershed_00
 # AUTHOR(S):  bharvey2
 # PURPOSE:    Run r.watershed and convert the resulting files to use with TauDEM
-# DATE:       2020-04-21
-#
-# NOTE: This script has no setup functions and must be run from within GRASS.
-# From GRASS GUI, click File > Launch script.
+# DATE:       2020-04-27
 #
 #################################################################################
 
-# %module
-# % description: Runs r.watershed and exports SRC and P files
-# % keyword: raster
-# % keyword: hydrology
-# % keyword: watershed
-# % keyword: export
-# %end
-# %option G_OPT_F_INPUT
-# % key: dem_path
-# % description: Absolute path to the DEM
-# %end
-# %option
-# % key: threshold
-# % type: integer
-# % label: Minimum size of exterior watershed basins, in cells.
-# % description: Depends on resolution. Ex: 20ft: 100, 10ft: 500, 5ft: 1200
-# % multiple: no
-# % required: yes
-# %end
+#%module
+#% description: Runs r.watershed and exports SRC and P files
+#% keyword: raster
+#% keyword: hydrology
+#% keyword: watershed
+#%end
+#%option G_OPT_F_INPUT
+#% key: dem
+#% description: Absolute path to the DEM
+#% required: yes
+#%end
+#%option
+#% key: threshold
+#% type: integer
+#% label: Minimum size of exterior watershed basins, in cells.
+#% description: Depends on resolution. Ex: 20ft: 100, 10ft: 500, 5ft: 1200
+#% multiple: no
+#% required: yes
+#%end
 
 import sys
 from pathlib import Path
@@ -54,11 +51,9 @@ def import_dem_00(dem_path):
     name_parts = Path(str(dem_path)).name.split('_')
     out_raster = '_'.join(name_parts[0:2])
 
-    # Import the DEM
     gscript.run_command('r.in.gdal', input=str(dem_path),
                         output=out_raster, overwrite=True)
 
-    # Set computational region
     gscript.run_command('g.region', raster=out_raster)
 
     return out_raster
@@ -70,8 +65,7 @@ def get_threshold_00(resolution):
     Provides a reasonable minimum basin size for the resolution of the file.
     It will be more appropriate for some regions than others.
 
-    ..note::
-        This does NOT work when the module is run from within GRASS.
+    This does NOT work when the module is run from within GRASS.
 
     Parameters
     ----------
@@ -201,9 +195,10 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
 
     group_parent_path = prj / group_parent_name
 
-    grps = group_parent_path.glob(group_str + '*')
+    grps = list(group_parent_path.glob(group_str + '*'))
 
-    if grps:
+    # Find the highest group number
+    if len(grps) > 0:
         grpnos = []
         for grp in grps:
             grpno = grp.name.split("_")[0][-2:]
@@ -213,12 +208,13 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
         new_group_no = '00'
     old_group = dsm.name.split('_')[0]
     new_group = group_parent_path / "{}{}_{}".format(group_str, new_group_no, old_group)
-    Path.mkdir(new_group)
+
+    new_group.mkdir(parents=True)
 
     # Export file path
     out_file_name = "{}_{}{}_{}.tif".format(huc, name, new_group_no,
                                             dem.name.split("_")[1])
-    out_path = new_group.joinpath(out_file_name)
+    out_path = new_group / out_file_name
 
     gscript.run_command('r.out.gdal', input=in_raster, output=out_path,
                         format="GTiff", type="Int16",
@@ -271,7 +267,7 @@ def main():
     """
 
     options, flags = gscript.parser()
-    dem_path = options['dem_path']
+    dem_path = options['dem']
     threshold = options['threshold']
 
     dem_to_src_00(dem_path, threshold)
