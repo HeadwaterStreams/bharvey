@@ -28,6 +28,7 @@
 #% required: yes
 #%end
 
+
 import sys
 from pathlib import Path
 
@@ -49,42 +50,42 @@ def import_dem_00(dem_path):
     """
 
     name_parts = Path(str(dem_path)).name.split('_')
-    out_raster = '_'.join(name_parts[0:2])
+    elev_raster = '_'.join(name_parts[0:2])
 
     gscript.run_command('r.in.gdal', input=str(dem_path),
-                        output=out_raster, overwrite=True)
+                        output=elev_raster, overwrite=True)
 
-    gscript.run_command('g.region', raster=out_raster)
+    gscript.run_command('g.region', raster=elev_raster)
 
-    return out_raster
+    return elev_raster
 
 
-def get_threshold_00(resolution):
-    """Minimum basin size, based on resolution.
-
-    Provides a reasonable minimum basin size for the resolution of the file.
-    It will be more appropriate for some regions than others.
-
-    This does NOT work when the module is run from within GRASS.
-
-    Parameters
-    ----------
-    resolution : int
-        Resolution of the input DEM
-
-    Returns
-    -------
-    threshold : int
-        Value for minimum basin size, based on resolution
-    """
-
-    thresholds = {'20': 100, '10': 500, '5': 1200}
-
-    if str(resolution) in thresholds.keys():
-        threshold = thresholds[str(resolution)]
-        return threshold
-    else:
-        return "Minimum basin size required"
+# def get_threshold_00(resolution):
+#     """Minimum basin size, based on resolution.
+#
+#     Provides a reasonable minimum basin size for the resolution of the file.
+#     It will be more appropriate for some regions than others.
+#
+#     This does NOT work when the module is run from within GRASS.
+#
+#     Parameters
+#     ----------
+#     resolution : int
+#         Resolution of the input DEM
+#
+#     Returns
+#     -------
+#     threshold : int
+#         Value for minimum basin size, based on resolution
+#     """
+#
+#     thresholds = {'20': 100, '10': 500, '5': 1200}
+#
+#     if str(resolution) in thresholds.keys():
+#         threshold = thresholds[str(resolution)]
+#         return threshold
+#     else:
+#         return "Minimum basin size required"
 
 
 def watershed_00(in_raster_name, threshold):
@@ -239,7 +240,7 @@ def dem_to_src_00(dem_path, threshold):
 
     Returns
     -------
-    output_paths : list
+    dict:
         Paths to exported files
     """
 
@@ -256,7 +257,7 @@ def dem_to_src_00(dem_path, threshold):
 
     p = drain_to_p_00(drain, dem_path)
 
-    return {dem_path: {'src': src, 'p': p}}
+    return {'src': src, 'p': p}
 
 
 def main():
