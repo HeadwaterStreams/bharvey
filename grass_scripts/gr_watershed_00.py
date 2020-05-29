@@ -44,47 +44,18 @@ def import_dem_00(dem_path):
 
     Returns
     -------
-    out_raster : str
+    dem_ras : str
         Name of the imported raster
     """
 
     name_parts = Path(str(dem_path)).name.split('_')
-    out_raster = '_'.join(name_parts[0:2])
+    dem_ras = '_'.join(name_parts[0:2])
 
-    gscript.run_command('r.in.gdal', input=str(dem_path),
-                        output=out_raster, overwrite=True)
+    gscript.run_command('r.in.gdal', input=str(dem_path), output=dem_ras, overwrite=True)
 
-    gscript.run_command('g.region', raster=out_raster)
+    gscript.run_command('g.region', raster=dem_ras)
 
-    return out_raster
-
-
-def get_threshold_00(resolution):
-    """Minimum basin size, based on resolution.
-
-    Provides a reasonable minimum basin size for the resolution of the file.
-    It will be more appropriate for some regions than others.
-
-    This does NOT work when the module is run from within GRASS.
-
-    Parameters
-    ----------
-    resolution : int
-        Resolution of the input DEM
-
-    Returns
-    -------
-    threshold : int
-        Value for minimum basin size, based on resolution
-    """
-
-    thresholds = {'20': 100, '10': 500, '5': 1200}
-
-    if str(resolution) in thresholds.keys():
-        threshold = thresholds[str(resolution)]
-        return threshold
-    else:
-        return "Minimum basin size required"
+    return dem_ras
 
 
 def watershed_00(in_raster_name, threshold):
@@ -125,46 +96,46 @@ def watershed_00(in_raster_name, threshold):
     return watershed_rasters
 
 
-def drain_to_p_00(in_raster, dem):
+def drain_to_p_00(drain, dem):
     """Convert a drainage direction raster to P file
 
     Parameters
     ----------
-    in_raster : str
+    drain : str
         Name of GRASS drainage direction raster
     dem : str
     """
 
-    out_raster = in_raster.replace("drain", "p")
+    p_ras = drain.replace("drain", "p")
 
     expr = "{o} = if( {i}>=1, if({i}==8, 1, {i}+1), null() )".format(
-        o=out_raster, i=in_raster)
+        o=p_ras, i=drain)
 
     gscript.raster.mapcalc(expr, overwrite=True)
 
-    p_path = export_raster_00(out_raster, 'Surface_Flow', 'SFW', 'P', str(dem))
+    p_path = export_raster_00(p_ras, 'Surface_Flow', 'SFW', 'P', str(dem))
 
     return p_path
 
 
-def stream_to_src_00(in_raster, dem):
+def stream_to_src_00(stream, dem):
     """Convert a stream segments raster to SRC file
 
     Parameters
     ----------
     dem : str or obj
         Path to DEM file
-    in_raster : str
+    stream : str
         Name of GRASS stream raster
     """
 
-    out_raster = in_raster.replace('stream', 'src')
+    src_ras = stream.replace('stream', 'src')
 
     # All non-zero values to 1
-    expr = "{o} = if(isnull({i}), 0, 1)".format(o=out_raster, i=in_raster)
+    expr = "{o} = if(isnull({i}), 0, 1)".format(o=src_ras, i=stream)
     gscript.raster.mapcalc(expr, overwrite=True)
 
-    src_path = export_raster_00(out_raster, 'Stream_Pres', 'STPRES', 'SRC', dem)
+    src_path = export_raster_00(src_ras, 'Stream_Pres', 'STPRES', 'SRC', dem)
 
     return src_path
 
@@ -256,7 +227,7 @@ def dem_to_src_00(dem_path, threshold):
 
     p = drain_to_p_00(drain, dem_path)
 
-    return {dem_path: {'src': src, 'p': p}}
+    return {'src': src, 'p': p}
 
 
 def main():

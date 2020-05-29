@@ -7,7 +7,7 @@ From initial DEM and culvert shapefiles, create 3 new DSM groups:
 - DEM with breached depressions
 - DEM with culverts and breached depressions
 
-Quick & easy usage:
+Basic Usage:
 To create all DSM groups for 20ft resolution, on the first run, use
 process_dems_first_00([pipe files], dem_path)
 If you have a rasterized pipe zones file, use process_dems_00(pipe_zones_path,
@@ -64,12 +64,12 @@ def new_group_01(folder_path, source, name=None):
     
     Parameters
     ----------
-    folder_path : str or object
+    folder_path : str or path object
         Path to parent folder. Example: r'D:\...\Basins\CHOWN05\Surface'
         It does not have to exist.
     source : str
         Name substring for the source file or folder. Example: 'DEM00'
-    name : str
+    name : str, optional
         Name substring for the new group. Example: 'DSM'
         Only needed if there are no existing groups in the parent folder.
 
@@ -78,6 +78,7 @@ def new_group_01(folder_path, source, name=None):
     new_group : str
         Path to new group
     """
+
     from pathlib import Path
     
     folder = Path(str(folder_path))
@@ -104,13 +105,13 @@ def new_file_00(in_file_path, name, out_ext, out_grp_path=None):
     """
     Parameters
     ----------
-    in_file_path: str or object
+    in_file_path: str or path object
         Path to input file
     name: str
         Example: "DEM"
     out_ext: str
         File extension for the output file. Example: "shp"
-    out_grp_path: str or object
+    out_grp_path: str or path object
         Path to output directory. If none given, uses input directory.
     """
     from pathlib import Path
@@ -218,9 +219,8 @@ def merge_pipes_00(in_pipe_paths):
     
     last_pipe = Path(in_pipe_paths[-1])
     
-    out_group = new_group_01(str(last_pipe.parent.parent), last_pipe.stem.split(
-        '_')[
-        1], "PIPES")
+    out_group = new_group_01(str(last_pipe.parent.parent),
+                             last_pipe.stem.split('_')[1], "PIPES")
     output_path = new_file_00(str(last_pipe), "PIPES", "shp",
                               str(out_group))
     
@@ -233,7 +233,8 @@ def merge_pipes_00(in_pipe_paths):
 
 
 def extend_pipes_00(in_pipe_path, dist='20.0'):
-    """ Extend individual culvert lines at each end, by the specified distance.
+    """ Extend individual culvert lines at each end, by the specified distance
+
     Parameters
     ----------
     in_pipe_path : str
@@ -256,7 +257,8 @@ def extend_pipes_00(in_pipe_path, dist='20.0'):
 
 
 def pipes_to_raster_00(in_pipe_path, in_dem_path):
-    """ Convert the pipes feature to a raster. Lines will be 1 cell wide.
+    """Convert the pipes feature to a raster. Lines will be 1 cell wide.
+
     Parameters
     ----------
     in_pipe_path : str
@@ -286,8 +288,9 @@ def pipes_to_raster_00(in_pipe_path, in_dem_path):
 
 
 def zone_min_00(in_dem_path, in_zones_path):
-    """Sets the value of cells covered by culvert zones to the minimum
-    elevation within each zone.
+    """
+    Set cells in culvert zones to the min elevation for the zone
+
     Parameters
     ----------
     in_dem_path : str
@@ -311,9 +314,11 @@ def zone_min_00(in_dem_path, in_zones_path):
 
 
 def burn_min_00(in_dem_path, in_zones_path):
-    """Creates a new DSM group with values from the culvert zones file where
-    culverts exist and from the
+    """Create DEM with culvert zones burned in
+
+    Uses culvert zone min values where culvert zones exist and values from the
     original DEM file everywhere else.
+
     Parameters
     ----------
     in_dem_path : str
@@ -347,7 +352,8 @@ def burn_min_00(in_dem_path, in_zones_path):
 
 
 def breach_depressions_00(in_dem_path, breach_dist='20'):
-    """Runs whitebox breach_depressions_least_cost tool
+    """Run whitebox breach_depressions_least_cost tool
+
     Parameters
     ----------
     in_dem_path : str
@@ -373,12 +379,11 @@ def breach_depressions_00(in_dem_path, breach_dist='20'):
         return False
 
 
-# Testing
-def fill_and_breach_zones_00(old_dem, new_dem, min_depth=0.1):
+def fill_and_breach_zones_00(old_dem, new_dem, min_depth=0.1): #FIXME
     """Create polygons for fill zones and breaches
+
      Compares original vs post-breach-depressions DEM elevations. For any
-     cells where the difference exceeds min_depth, a polygon is
-     created.
+     cells where the difference exceeds min_depth, a polygon is created.
 
     Parameters
     ----------
@@ -395,13 +400,17 @@ def fill_and_breach_zones_00(old_dem, new_dem, min_depth=0.1):
     # Create difference raster
     diff = new_file_00(new_dem, 'DIFF', 'tif')
     wbt.subtract(str(new_dem), str(old_dem), diff)
+
+    #############
+    # Fill Zones
+    #############
     
-    # Create a patch mask file
+    # Create patches where new_dem > old_dem
     fill_cells = new_file_00(diff, 'FCEL', 'tif')
     f_patch_vals = '0;min;{d};1;{d};max'.format(d=min_depth)
     wbt.reclass(diff, fill_cells, f_patch_vals)
 
-    # Clump contiguous cells
+    # Clump contiguous fill zone cells
     fill_clumps = new_file_00(fill_cells, 'FCLMP', 'tif')
     wbt.clump(fill_cells, fill_clumps, diag=True, zero_back=True)
 
@@ -429,40 +438,7 @@ def fill_and_breach_zones_00(old_dem, new_dem, min_depth=0.1):
     # Add area field
     wbt.polygon_area(fill_poly)
 
-    # # Create a breach zone file with 0 and 1 values
-    # breach_cells = new_file_00(diff, 'BCEL', 'tif')
-    # wbt.less_than(diff, '-0.1', breach_cells, incl_equals=True)
-    # wbt.modify_no_data_value(breach_cells, new_value="0")
 
-
-# Testing
-# def find_breach_00(old_dem, new_dem):
-#     """
-#
-#     Parameters
-#     ----------
-#     old_dem :
-#     new_dem :
-#     """
-#     from WBT.whitebox_tools import WhiteboxTools
-#
-#     wbt = WhiteboxTools()
-#
-#     diff = new_file_00(new_dem, 'BDIF', 'tif')
-#     wbt.subtract(old_dem, new_dem, diff)
-#
-#     # Reclass (everything not 0 or nodata = 1)
-#     zones = new_file_00(diff, 'BZ', 'tif')
-#     wbt.greater_than(diff, '0', zones)
-#
-#     # Zonal stats
-#     means = new_file_00(diff, 'BMEAN', 'tif')
-#     wbt.zonal_statistics(diff, zones, means, stat="mean")
-#
-#     # Raster to polygon
-#     breach_poly = new_file_00(means, 'BP', 'shp')
-#     wbt.raster_to_vector_polygons(means, breach_poly)
-    
 
 
 #########################################################################

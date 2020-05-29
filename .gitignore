@@ -61,8 +61,10 @@ MANIFEST
 /venv/
 
 
-/dir_structure/
+/general_scripts/
 /arcpy_scripts/
 /docs/
 cmder_work_profile.cmd
 /whitebox_scripts/wb_hydro_test.txt
+*/notes/
+.idea

@@ -1,4 +1,6 @@
-# Converting GRASS r.watershed results for use with TauDEM
+
+Converting GRASS r.watershed results for use with TauDEM
+========================================================
 
 Before doing any of the following, set the computational region to match the
  input raster.
@@ -8,8 +10,8 @@ gscript.run_command('g.region', raster=imported_dem)
 ```
 
 
-## Drainage Direction to P
-
+Drainage Direction to P
+------------------------
 
 | dir | GRASS | TauDEM |
 | --- | -----:| ------:|
@@ -26,7 +28,8 @@ gscript.run_command('g.region', raster=imported_dem)
 expr = "{o} = if({i}=>1, if({i}==8, 1, {i} + 1), null())".format(o=output, i=input)
 ```
 
-## Stream segments to SRC
+Stream segments to SRC
+----------------------
 
 - nodata = 0
 - Anything else = 1
@@ -35,7 +38,8 @@ expr = "{o} = if({i}=>1, if({i}==8, 1, {i} + 1), null())".format(o=output, i=inp
 expr = "{o} = if(isnull({i}), 0, 1)".format(o=output, i=input)
 ```
 
-## Export file settings
+Export file settings
+-----------------------
 
 - format: GTiff
 - type: Int16

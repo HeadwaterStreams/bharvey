@@ -1,7 +1,15 @@
 #! python3
-"""
+""" Runs TauDEM tools
 
+Notes
+-----
+    Basic usage:
+    To create the initial sfw group, run `dem_to_sfw_00`.
 
+    To create a stream network group from the files exported from GRASS, run `watershed_to_snet_00`
+
+TODO:
+    * Add paths of new files to a dictionary or class for use with batch functions
 """
 
 
@@ -16,7 +24,7 @@ def td_cmd_00(tool_args):
 
 
 def pit_remove_00(dem_path):
-    """Create SFW group and FEL
+    """Create SFW group and FEL file
 
     Parameters
     ----------
@@ -25,8 +33,8 @@ def pit_remove_00(dem_path):
 
     Returns
     -------
-    fel: object
-        FEL file path, as Path object
+    fel: path object
+        FEL file path
     """
     from pathlib import Path
 
@@ -48,12 +56,12 @@ def flow_dir_00(fel_path):
 
     Parameters
     ----------
-    fel_path: str
+    fel_path: str or path object
         Path to FEL tif
 
     Returns
     -------
-    p: object
+    p: path object
         Pointer file path, as Path object
     """
     from pathlib import Path
@@ -81,8 +89,8 @@ def area_d8_00(p_path):
 
     Returns
     -------
-    d8: object
-        D8 Area file, as Path object
+    d8: path object
+        D8 Area file
     """
     from pathlib import Path
 
@@ -107,7 +115,8 @@ def grid_net_00(p_path):
 
     Returns
     -------
-
+    dict
+        Dictionary of paths to sfw group and files
     """
     from pathlib import Path
 
@@ -117,7 +126,7 @@ def grid_net_00(p_path):
     sfw = p.parent
     plen_name = p.name.replace("P", "PLEN").replace("FEL", "P")
     tlen_name = p.name.replace("P", "TLEN").replace("FEL", "P")
-    gord_name =  p.name.replace("P", "GORD").replace("FEL", "P")
+    gord_name = p.name.replace("P", "GORD").replace("FEL", "P")
 
     plen = sfw / plen_name
     tlen = sfw / tlen_name
@@ -127,7 +136,12 @@ def grid_net_00(p_path):
 
     td_cmd_00(td_args)
 
-    return sfw
+    return dict(
+        sfw=sfw,
+        plen=plen,
+        tlen=tlen,
+        gord=gord,
+    )
 
 
 ################################
@@ -146,13 +160,12 @@ def dem_to_sfw_00(dem_path):
     sfw: dict
     """
 
-    fel = pit_remove_00(str(dem_path))
-    p = flow_dir_00(str(fel))
-    d8 = area_d8_00(str(p))
-    grid_net_00(str(p))
-
-    sfw = {'fel': fel, 'p': p, 'd8': d8}
-    return sfw
+    fel = pit_remove_00(dem_path)
+    p = flow_dir_00(fel)
+    d8 = area_d8_00(p)
+    out_paths = grid_net_00(p)
+    out_paths.update(fel=fel, p=p, d8=d8)
+    return out_paths
 
 
 ###########################################
@@ -214,7 +227,8 @@ def stream_net_00(fel_path, p_path, ad8_path, src_path):
 
     Returns
     -------
-
+    dict
+        Paths to newly created groups and files
     """
     from pathlib import Path
 
@@ -262,11 +276,20 @@ def stream_net_00(fel_path, p_path, ad8_path, src_path):
 
     td_cmd_00(td_args)
 
-    return rch
+    return dict(
+        snet=snet_grp,
+        ord=ord,
+        tree=tree,
+        coord=coord,
+        rch=rch,
+        bsn=bsn_grp,
+    )
 
+######################################################################
+# Combined functions
+#
+######################################################################
 
-# Combined functions. Run these after using other tools to produce the
-# stream net
 
 def inverse_plan_to_snet_00(invplan_path, threshold, fel, p, d8, src):  # FIXME
     """Create flow weighted, stream src, & stream net groups from planform
@@ -275,6 +298,8 @@ def inverse_plan_to_snet_00(invplan_path, threshold, fel, p, d8, src):  # FIXME
 
     src = threshold_00(str(invplan_path), threshold)
     rch = stream_net_00(str(fel), str(p), str(d8), str(src))
+
+    return dict(src=src, rch=rch)
 
 
 def watershed_to_snet_00(dem_path, p_path, src_path):
@@ -290,9 +315,10 @@ def watershed_to_snet_00(dem_path, p_path, src_path):
         Path to the SRC file exported from GRASS
     """
 
-    fel = pit_remove_00(str(dem_path))
-    d8_area = area_d8_00(str(p_path))
-    rch = stream_net_00(str(fel), str(p_path), str(d8_area), str(src_path))
+    fel = pit_remove_00(dem_path)
+    d8_area = area_d8_00(p_path)
+    out_paths = stream_net_00(fel, p_path, d8_area, src_path)
 
+    out_paths.update(fel=fel, d8=d8_area)
 
-
+    return out_paths
