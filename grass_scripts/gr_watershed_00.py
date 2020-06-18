@@ -51,9 +51,9 @@ def import_dem_00(dem_path):
     name_parts = Path(str(dem_path)).name.split('_')
     dem_ras = '_'.join(name_parts[0:2])
 
-    gscript.run_command('r.in.gdal', input=str(dem_path), output=dem_ras, overwrite=True)
+    gscript.run_command('r.in.gdal', input=str(dem_path), output=dem_ras, overwrite=True, verbose=True)  #TODO: Instead of overwrite, check if it has already been imported.
 
-    gscript.run_command('g.region', raster=dem_ras)
+    gscript.run_command('g.region', raster=dem_ras, verbose=True)
 
     return dem_ras
 
@@ -210,7 +210,7 @@ def dem_to_src_00(dem_path, threshold):
 
     Returns
     -------
-    output_paths : list
+    output_paths : dict
         Paths to exported files
     """
 

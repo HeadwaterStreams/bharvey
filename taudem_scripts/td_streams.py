@@ -1,12 +1,11 @@
 #! python3
 """ Runs TauDEM tools
 
-Notes
+Usage
 -----
-    Basic usage:
-    To create the initial sfw group, run `dem_to_sfw_00`.
+To create the initial sfw group, run `dem_to_sfw_00`.
 
-    To create a stream network group from the files exported from GRASS, run `watershed_to_snet_00`
+To create a stream network group from the files created using the GRASS r.watershed tool, run `watershed_to_snet_00`
 
 TODO:
     * Add paths of new files to a dictionary or class for use with batch functions
@@ -24,7 +23,7 @@ def td_cmd_00(tool_args):
 
 
 def pit_remove_00(dem_path):
-    """Create SFW group and FEL file
+    """Creates SFW group and FEL file.
 
     Parameters
     ----------
@@ -52,7 +51,7 @@ def pit_remove_00(dem_path):
     
 
 def flow_dir_00(fel_path):
-    """Create pointer and slope files
+    """Creates pointer and slope files.
 
     Parameters
     ----------
@@ -80,7 +79,7 @@ def flow_dir_00(fel_path):
 
  
 def area_d8_00(p_path):
-    """Create D8 Area file
+    """Creates D8 Area file.
 
     Parameters
     ----------
@@ -144,11 +143,11 @@ def grid_net_00(p_path):
     )
 
 
-################################
-# === Run all of the above === #
+# ============================
+# === Run all of the above ===
 
 def dem_to_sfw_00(dem_path):
-    """Create SFW group with all TauDEM results
+    """Create SFW group with all TauDEM results.
 
     Parameters
     ----------
@@ -168,8 +167,9 @@ def dem_to_sfw_00(dem_path):
     return out_paths
 
 
-###########################################
-# Not done testing anything below this line
+# ==========================================
+#! Not done testing anything below this line
+
 
 def threshold_00(ssa_path, threshold):
     """
@@ -292,7 +292,7 @@ def stream_net_00(fel_path, p_path, ad8_path, src_path):
 
 
 def inverse_plan_to_snet_00(invplan_path, threshold, fel, p, d8, src):  # FIXME
-    """Create flow weighted, stream src, & stream net groups from planform
+    """Creates flow weighted, stream src, & stream net groups from planform.
 
     """
 
@@ -303,7 +303,7 @@ def inverse_plan_to_snet_00(invplan_path, threshold, fel, p, d8, src):  # FIXME
 
 
 def watershed_to_snet_00(dem_path, p_path, src_path):
-    """Create SNET group and RCH network from GRASS r.watershed results and related DEM
+    """Creates SNET group and RCH network from GRASS r.watershed results and related DEM.
 
     Parameters
     ----------
@@ -313,6 +313,10 @@ def watershed_to_snet_00(dem_path, p_path, src_path):
         Path to the P file exported from GRASS
     src_path : str
         Path to the SRC file exported from GRASS
+
+    Returns
+    -------
+    out_paths : dict
     """
 
     fel = pit_remove_00(dem_path)
