@@ -1,4 +1,4 @@
-#!C:\Apps\GRASS78\Python37\python.exe
+#!/usr/bin/env python3
 """
 Runs GRASS watershed tool from outside the GRASS user interface.
 
@@ -138,93 +138,8 @@ def set_grass_envs_00(grass_bin=None, gisbase=None):
     return grass_interpreter
 
 
-# def location_setup():
-#
-#     import sys
-#     import subprocess
-#     from pathlib import Path
-#
-#     # Create DB, Location, and Mapset
-#
-#     grass_db = Path(str(grass_db_path))
-#     if not grass_db.exists():
-#         grass_db.mkdir(parents=True)
-#     os.environ['GISDBASE'] = str(grass_db)
-#
-#     # Create location name from dem filename
-#     dem = Path(str(dem_path))
-#     name_parts = dem.stem.split('_')
-#     loc_name = '_'.join(name_parts[0:2])
-#
-#     # Create location
-#     loc_path = grass_db / loc_name
-#     if not loc_path.exists():
-#         loc_cmd = [str(grass_bin), '-c', dem_path, '-e', str(loc_path)]
-#         try:
-#             p_loc = subprocess.Popen(loc_cmd, shell=False,
-#                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-#             out, err = p_loc.communicate()
-#         except OSError as error:
-#             sys.exit("ERROR: Cannot find GRASS GIS start script"
-#                      " {cmd}: {error}".format(cmd=loc_cmd[0], error=error))
-#         if p_loc.returncode != 0:
-#             sys.exit("ERROR: Issues running GRASS GIS start script"
-#                      " {cmd}: {error}"
-#                      .format(cmd=' '.join(loc_cmd), error=err))
-#
-#     # Start session
-#     import grass.script as gscript
-#     import grass.script.setup as gsetup
-#
-#     rc_file = gsetup.init(grass_base, str(grass_db), loc_name, 'PERMANENT')
-#
-#     return rc_file
-
-
-# def new_location_00(dem_path, grass_db_path, grass_bin_path):
-    # """Creates a new GRASS location and imports the DEM as an elevation raster.
-
-    # TODO: Move location and import steps here
-
-    # Parameters
-    # ----------
-    # dem_path
-    # grass_db_path
-
-    # Returns
-    # -------
-
-    # """
-
-    # import subprocess
-    # import sys
-    # from pathlib import Path
-
-    # dem = Path(dem_path)
-
-    # # create location name from dem filename
-    # name_parts = dem.stem.split('_')
-    # loc_name = '_'.join(name_parts[0:2])
-
-    # # Create location
-    # loc_path = grass_db_path / loc_name
-    # if not loc_path.exists():
-        # startcmd = [grass_bin_path, '-c', dem_path, '-e', str(loc_path)]
-        # try:
-            # p = subprocess.Popen(startcmd, shell=False,
-                                 # stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            # out, err = p.communicate()
-        # except OSError as error:
-            # sys.exit("ERROR: Cannot find GRASS GIS start script"
-                     # " {cmd}: {error}".format(cmd=startcmd[0], error=error))
-        # if p.returncode != 0:
-            # sys.exit("ERROR: Issues running GRASS GIS start script"
-                     # " {cmd}: {error}"
-                     # .format(cmd=' '.join(startcmd), error=err))
-
-
 def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
-                     grass_bin_path=None, min_basin_size=None):
+                     grass_bin=None, min_basin_size=None):
     """Runs r.watershed on a single DEM and exports P and SRC files.
 
     Because of problems with running grass modules from Python outside of the GRASS interface, this script sets all the necessary
@@ -239,7 +154,7 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
         Resolution of the DEM (20, 10, 5...)
     grass_data_path : str or Path obj
         Path to grass data root folder
-    grass_bin_path : str or Path obj, optional
+    grass_bin : str or Path obj, optional
         Path to grass7*.bat
     min_basin_size : int or str, optional
         Minimum size, in cells, for a sub-basin.
@@ -255,10 +170,9 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
     import sys
     import subprocess
 
-    if grass_bin_path == None:
-        grass_bin_path = get_grass_bin_00()
-    gbase = get_grass_dir_00(grass_bin_path)
-    #gpy = set_grass_envs_00(gbin, gbase)
+    if grass_bin == None:
+        grass_bin = get_grass_bin_00()
+    gbase = get_grass_dir_00(grass_bin)
 
     grass_db = Path(str(grass_data_path))
     dem = Path(str(dem_path))
@@ -277,7 +191,7 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
 
     # Create location and mapset if it doesn't exist
     if not loc_path.exists():
-        new_loc_cmd = [grass_bin_path, '-c', dem_path, '-e', str(loc_path)]
+        new_loc_cmd = [grass_bin, '-c', dem_path, '-e', str(loc_path)]
         try:
             p1 = subprocess.Popen(new_loc_cmd, shell=False,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -291,7 +205,7 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
                      .format(cmd=' '.join(new_loc_cmd), error=err))
 
 
-    # Select minimum basin threshold if not specified:
+    # Pick minimum basin threshold if not specified:
     if min_basin_size is None:
         thresholds = {'20': 100, '10': 500, '5': 1200}
         if str(dem_resolution) in thresholds.keys():
@@ -301,11 +215,10 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
 
 
     # Run script
-
     os.environ['GRASS_ADDON_PATH'] = str(Path(script_path).parent)
 
-    cmd = '"{g}" {m}\  --exec python "{s}" dem="{d}" threshold={t} '.format(g=grass_bin_path, m=mapset_path, s=script_path, d=dem_path,
-                                                                    t=min_basin_size) # This creates the same command that works if I paste it in the terminal.
+    cmd = '"{g}" {m}\  --exec python "{s}" dem="{d}" threshold={t} '.format(g=grass_bin, m=mapset_path, s=script_path, d=dem_path,
+                                                                            t=min_basin_size)
     try:
         p = subprocess.Popen(cmd, shell=True,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -324,15 +237,18 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
     #TODO: Get output file paths and return them as a dict
 
 
-
 if __name__ == "__main__":
+    pass
 
+    """
+    Test data:
     db_path = r"D:\HSSD\Projects\Experimental\grassdata"
     script_path = r"C:\HSSD\Code_Prjs\bharvey\grass_scripts\gr_watershed_00.py"
 
     dem_path = r"D:\HSSD\Projects\Experimental\PilotBasins_20ft\LUMBR05\Surface\DSM01_DEM00\LUMBR05_DEM01_DEM00.tif"
     resolution = 20
     min_basin = 100
-
+    
     watershed_ext_00(dem_path, resolution, db_path, script_path)
+    """
 
