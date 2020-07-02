@@ -381,61 +381,7 @@ def breach_depressions_00(in_dem_path, breach_dist='20'):
     return output_path
 
 
-def fill_and_breach_zones_00(old_dem, new_dem, min_depth=0.1): #FIXME
-    """Creates polygons for locations that were either filled or breached.
 
-     Compares original vs post-breach-depressions DEM values. For any
-     cells where the difference exceeds min_depth, a polygon is created.
-
-    Parameters
-    ----------
-    old_dem : str or object
-        Path to original DEM
-    new_dem : str or object
-        Path to new DEM created with breach_depressions
-    min_depth : float or str
-        Minimum difference between DEMs, in feet
-    """
-    from WBT.whitebox_tools import WhiteboxTools
-    wbt = WhiteboxTools()
-
-    # Create difference raster
-    diff = new_file_00(new_dem, 'DIFF', 'tif')
-    wbt.subtract(str(new_dem), str(old_dem), diff)
-
-    # Create patches where new_dem > old_dem
-    fill_cells = new_file_00(diff, 'FCEL', 'tif')
-    f_patch_vals = '0;min;{d};1;{d};max'.format(d=min_depth)
-    wbt.reclass(diff, fill_cells, f_patch_vals)
-
-    # Clump contiguous fill zone cells
-    fill_clumps = new_file_00(fill_cells, 'FCLMP', 'tif')
-    wbt.clump(fill_cells, fill_clumps, diag=True, zero_back=True)
-
-    # Find area of clumps
-    clump_area = new_file_00(fill_clumps, 'FAREA', 'tif')
-    wbt.raster_area(fill_clumps, clump_area, out_text=False, units="grid cells",
-                    zero_back=True)
-    # Remove single-cell clumps
-    multi_cell = new_file_00(clump_area, 'FPTCH', 'tif')
-    patch_area_vals = '0;min;2;1;2;max'
-    wbt.reclass(clump_area, multi_cell, patch_area_vals)
-    wbt.modify_no_data_value(multi_cell, "0")
-
-    # Clump contiguous cells again
-    fill_zones = new_file_00(multi_cell, 'FZ', 'tif')
-    wbt.clump(multi_cell, fill_zones, diag=True, zero_back=True)
-
-    # Zonal stats
-    means = new_file_00(diff, 'FMEAN', 'tif')
-    wbt.zonal_statistics(diff, fill_zones, means, stat="mean")
-
-    # Raster to polygon
-    fill_poly = new_file_00(means, 'FP', 'shp')
-    wbt.raster_to_vector_polygons(means, fill_poly)
-
-    # Add area field
-    wbt.polygon_area(fill_poly)
 
 
 # ==========================

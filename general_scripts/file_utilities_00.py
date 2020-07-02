@@ -1,6 +1,6 @@
 #! python3
 """
-Functions to parse and create file names and paths
+Functions to parse and create file names and paths.
 
 
 """

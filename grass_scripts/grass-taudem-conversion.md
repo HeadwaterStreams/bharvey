@@ -2,8 +2,7 @@
 Converting GRASS r.watershed results for use with TauDEM
 ========================================================
 
-Before doing any of the following, set the computational region to match the
- input raster.
+Before doing any of the following, set the computational region to match the input raster.
 
 ```python
 gscript.run_command('g.region', raster=imported_dem)
