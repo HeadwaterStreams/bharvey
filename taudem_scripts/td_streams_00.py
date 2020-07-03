@@ -84,7 +84,7 @@ def area_d8_00(p_path):
     Parameters
     ----------
     p_path: str
-        Path to pointer file
+        Path to pointer file, which could be created by TauDEM or r.watershed.
 
     Returns
     -------

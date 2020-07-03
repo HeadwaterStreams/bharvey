@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-Runs GRASS watershed tool from outside the GRASS user interface.
+Runs GRASS tools from outside the GRASS user interface.
 
+    Because of problems with running grass modules from Python outside of the GRASS interface, this script sets all the necessary
+    variables and then sends a command to the terminal to run GRASS with another module instead of directly working with GRASS.
+    This way the two scripts can be run by different Python installations.
+
+    WARNING: I have not tested this script but `geomorphons_ext_00` definitely does not work yet.
 
 """
 
@@ -49,6 +54,51 @@ def get_grass_bin_00():
     return str(gb)
 
 
+def run_command_00(command, msg, err_msg, grass_bin=None):
+    """
+
+    Parameters
+    ----------
+    grass_bin: str or Path obj, optional
+        Path to grass78.bat
+    command: str
+        Command to run.
+    err_msg: str
+        Error message.
+    msg: str
+        Message to print on success.
+
+    Returns
+    -------
+    output: dict
+        Command output and files created, if any.
+
+    """
+
+    import subprocess
+    import sys
+
+    if grass_bin == None:
+        grass_bin = get_grass_bin_00()
+
+    cmd = '"{g}" {c}'.format(g=grass_bin, c=command)
+    try:
+        p = subprocess.Popen(cmd, shell=False,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        out, err = p.communicate()
+    except OSError as error:
+        sys.exit("ERROR: Cannot find GRASS GIS start script"
+                 " {cmd}: {error}".format(cmd=cmd[0], error=error))
+    if p.returncode != 0:
+        sys.exit("{e}"
+                 " {cmd}: {error}"
+                 .format(e=err_msg, cmd=' '.join(cmd), error=err))
+    else:
+        sys.exit(msg)
+
+    #TODO: return dictionary w/ paths to any files that were created.
+
+
 def get_grass_dir_00(grass_bin):
     """ Finds GRASS install location.
 
@@ -68,6 +118,8 @@ def get_grass_dir_00(grass_bin):
     # Get grass_base and python path
     # Query GRASS GIS itself for its GISBASE
     basecmd = [str(grass_bin), '--config', 'path']
+
+    # TODO: Replace this block with a call to `run_command_00`
     try:
         p = subprocess.Popen(basecmd, shell=False,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -118,7 +170,11 @@ def set_grass_envs_00(grass_bin=None, gisbase=None):
     # Add GRASS python dirs to path
     grass_py = os.path.join(gisbase, "etc", "python")
     
-
+    # Find GRASS or OSGEO Python env
+    # if os.environ['GRASS_PYTHON'] == None:
+    #    dirs = [base, base.parent.parent]
+    #    for dir in [d for d in dirs if d.exists()]:
+    #        searchdirs.extend([p for p in list(dir.iterdir()) if (p.is_dir() and 'Python' in p.name)])
     
     grass_interpreter = os.path.join(gisbase, "Python37", "python.exe")  # TODO: Replace with a search so other versions will work
     os.environ['GRASS_PYTHON'] = grass_interpreter
@@ -132,13 +188,67 @@ def set_grass_envs_00(grass_bin=None, gisbase=None):
     return grass_interpreter
 
 
+def geomorphon_ext_00(dem_path, grass_data_path, script_path,
+                       grass_bin=None):
+    """Runs geomorphon tools on a single DEM.
+
+
+    Parameters
+    ----------
+    dem_path : str
+        Path to the DEM to import
+    grass_data_path : str or Path obj
+        Path to grass data root folder
+    script_path : str or Path obj #TODO: Make this optional, it should be in the same folder as this script.
+        Path to `gr_geomorphon_00.py`
+    grass_bin : str or Path obj, optional
+        Path to grass7*.bat
+
+    Returns
+    -------
+    dict
+        Paths to exported files `p` and `src`
+    """
+    from pathlib import Path
+    import os
+
+    if grass_bin == None:
+        grass_bin = get_grass_bin_00()
+    gbase = get_grass_dir_00(grass_bin)
+    #gpy = set_grass_envs_00(gbin, gbase)
+
+    grass_db = Path(str(grass_data_path))
+    dem = Path(str(dem_path))
+    os.environ['GRASS_ADDON_PATH'] = str(Path(script_path).parent)
+
+    # create location name from dem filename
+    name_parts = dem.stem.split('_')
+    loc_name = '_'.join(name_parts[0:2])
+    loc_path = grass_db / loc_name
+    mapset_path = loc_path / 'PERMANENT'
+    grs_dem = '_'.join(name_parts[0:2]) # Name for the GRASS raster created from the DEM
+
+    # Create grass_db folder if it doesn't exist
+    if not grass_db.exists():
+        grass_db.mkdir(parents=True)
+    os.environ['GISDBASE'] = str(grass_db)
+
+    # Create location and mapset if it doesn't exist
+    if not loc_path.exists():
+        new_loc_cmd = '-c "{d}" -e "{l}"'.format(d=str(dem_path), l=str(loc_path))
+        run_command_00(new_loc_cmd, "New Location: {}".format(loc_path), "ERROR: Location not created")
+
+    # Run script
+    geo_cmd = '{m}\  --exec python "{s}" dem="{d}"'.format(m=mapset_path, s=script_path, d=dem_path)
+    run_command_00(geo_cmd, "Geomorphon tool run successfully", "ERROR: Issues running GRASS GIS script")
+
+    #TODO: Print message when the script is done
+    #TODO: Get output file paths and return them as a dict
+
+
 def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
                      grass_bin=None, min_basin_size=None):
     """Runs r.watershed on a single DEM and exports P and SRC files.
-
-    Because of problems with running grass modules from Python outside of the GRASS interface, this script sets all the necessary
-    variables and then sends a command to the terminal to run GRASS with another module instead of directly working with GRASS.
-    This way the two scripts can be run by separate Python installations.
 
     Parameters
     ----------
@@ -161,8 +271,6 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
     """
     from pathlib import Path
     import os
-    import sys
-    import subprocess
 
     if grass_bin == None:
         grass_bin = get_grass_bin_00()
@@ -170,6 +278,9 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
 
     grass_db = Path(str(grass_data_path))
     dem = Path(str(dem_path))
+
+    # =================================================================================================
+    #TODO: Move this to its own function.
 
     # create location name from dem filename
     name_parts = dem.stem.split('_')
@@ -185,19 +296,10 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
 
     # Create location and mapset if it doesn't exist
     if not loc_path.exists():
-        new_loc_cmd = [grass_bin, '-c', dem_path, '-e', str(loc_path)]
-        try:
-            p1 = subprocess.Popen(new_loc_cmd, shell=False,
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            out, err = p1.communicate()
-        except OSError as error:
-            sys.exit("ERROR: Cannot find GRASS GIS start script"
-                     " {cmd}: {error}".format(cmd=new_loc_cmd[0], error=error))
-        if p1.returncode != 0:
-            sys.exit("ERROR: Issues running GRASS GIS start script"
-                     " {cmd}: {error}"
-                     .format(cmd=' '.join(new_loc_cmd), error=err))
+        new_loc_cmd = '-c "{d}" -e "{l}"'.format(d=str(dem_path), l=str(loc_path))
+        run_command_00(new_loc_cmd, "New Location: {}".format(loc_path), "ERROR: Location not created")
 
+    # =========================================================================================================
 
     # Pick minimum basin threshold if not specified:
     if min_basin_size is None:
@@ -207,42 +309,28 @@ def watershed_ext_00(dem_path, dem_resolution, grass_data_path, script_path,
         else:
             print("Minimum basin size required")
 
-
     # Run script
-    os.environ['GRASS_ADDON_PATH'] = str(Path(script_path).parent)
+    os.environ['GRASS_ADDON_PATH'] = str(Path(script_path).parent) # TODO: Move to set_grass_envs
 
-    cmd = '"{g}" {m}\  --exec python "{s}" dem="{d}" threshold={t} '.format(g=grass_bin, m=mapset_path, s=script_path, d=dem_path,
+    watershed_cmd = '"{g}" {m}\  --exec python "{s}" dem="{d}" threshold={t} '.format(g=grass_bin, m=mapset_path, s=script_path, d=dem_path,
                                                                             t=min_basin_size)
-    try:
-        p = subprocess.Popen(cmd, shell=True,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        out, err = p.communicate()
-    except OSError as error:
-        sys.exit("ERROR: Cannot find GRASS GIS start script"
-                 " {cmd}: {error}".format(cmd=cmd[0], error=error))
-    if p.returncode != 0:
-        sys.exit("ERROR: Issues running GRASS GIS start script"
-                 " {cmd}: {error}"
-                 .format(cmd=' '.join(cmd), error=err))
-    else:
-        sys.exit("Watershed tool run succesfully.")
+    run_command_00(watershed_cmd, "Watershed tool run successfully", "ERROR: Issues running GRASS GIS script")
 
-    #TODO: Print message when the script has run successfully
+
+    #TODO: Print confirmation message when the script is done
     #TODO: Get output file paths and return them as a dict
 
 
 if __name__ == "__main__":
     pass
-
     """
-    Test data:
-    db_path = r"D:\HSSD\Projects\Experimental\grassdata"
-    script_path = r"C:\HSSD\Code_Prjs\bharvey\grass_scripts\gr_watershed_00.py"
-
-    dem_path = r"D:\HSSD\Projects\Experimental\PilotBasins_20ft\LUMBR05\Surface\DSM01_DEM00\LUMBR05_DEM01_DEM00.tif"
-    resolution = 20
-    min_basin = 100
+    db_path = r"D:\HSSD\Projects\Experimental\grassdata"        
+    dem_path = r"D:\HSSD\Projects\Experimental\PilotBasins_20ft\LUMBR05\Surface\DSM01_DEM00\LUMBR05_DEM01_DEM00.tif"\
     
-    watershed_ext_00(dem_path, resolution, db_path, script_path)
+    gm_script_path = r"C:\HSSD\Code_Prjs\bharvey\grass_scripts\gr_geomorphon_00.py"
+    geomorphons_ext_00(dem_path, db_path, gm_script_path)
+    
+    dem_res = 20
+    w_script_path = r"C:\HSSD\Code_Prjs\bharvey\grass_scripts\gr_watershed_00.py"
+    watershed_ext_00(dem_path, dem_res, db_path, w_script_path, min_basin_size=100)
     """
-

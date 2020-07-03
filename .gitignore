@@ -67,4 +67,6 @@ MANIFEST
 cmder_work_profile.cmd
 /whitebox_scripts/wb_hydro_test.txt
 */notes/
-.idea
+/grass_scripts/watershed_cmd.bat
+/grass_scripts/grass_basic_test.py
+/grass_scripts/gr_watershed_00_test.rst
