@@ -3,14 +3,15 @@
 #
 # MODULE:     gr_geomorphon_00
 # AUTHOR(S):  bharvey2
-# PURPOSE:    Runs geomorphons tool and converts the resulting files to use with TauDEM
-# DATE:       2020-07-02
+# PURPOSE:    Runs r.geomorphon and exports a file with valleys, hollows, and depressions
+# DATE:       2020-07-06
 #
 #################################################################################
 
 #%module
-#% description: Runs r.geomorphon and exports GEOM files
+#% description: Runs r.geomorphon and exports GEOM file
 #% keyword: raster
+#% keyword: geomorphons
 #% keyword: terrain patterns
 #%end
 #%option G_OPT_F_INPUT
@@ -18,159 +19,108 @@
 #% description: Absolute path to the DEM
 #% required: yes
 #%end
+#%option
+#% key: search
+#% type: integer
+#% required: yes
+#% multiple: no
+#% description: Outer search radius
+#% answer: 30
+#%end
+#%option
+#% key: skip
+#% type: integer
+#% required: yes
+#% multiple: no
+#% description: Inner search radius
+#% answer: 0
+#%end
+#%option
+#% key: flat
+#% type: double
+#% required: yes
+#% multiple: no
+#% description: Flatenss threshold (degrees)
+#% answer: 1
+#%end
+#%option
+#% key: dist
+#% type: double
+#% required: yes
+#% multiple: no
+#% description: Flatenss distance, zero for none
+#% answer: 0
+#%end
 
+
+# TODO: Test from gr_external_00
 
 import sys
-from pathlib import Path
 
 import grass.script as gscript
 
 
-def import_dem_00(dem_path):
-    """Import the DEM as a GRASS raster and set the region to match it
+def geomorphon_00(dem_path, **kwargs):
+    """
 
     Parameters
     ----------
-    dem_path : str
-        Path to the DEM
+    dem_path: str or Path obj
+        Path to the original DEM
+    kwargs: dict, optional
+        All other arguments.
+        search: Outer search radius. Use higher numbers for flatter areas. Default=3
+        skip: Inner search radius. Default=0
+        flat: Flatness threshold in degrees. Default=1
+        dist: Default=0
 
-    Returns
-    -------
-    dem_ras : str
-        Name of the imported raster
     """
 
-    name_parts = Path(str(dem_path)).name.split('_')
-    dem_ras = '_'.join(name_parts[0:2])
-
-    gscript.run_command('r.in.gdal', input=str(dem_path), output=dem_ras, overwrite=True, verbose=True)  #TODO: Instead of overwrite, check if it has already been imported.
-
-    gscript.run_command('g.region', raster=dem_ras, verbose=True)
-
-    return dem_ras
-
-
-def geomorphon_00(in_raster, dem, search=3, skip=0, flat=1, dist=0):
-    """Run r.geomorphon
-
-    Parameters
-    ----------
-    in_raster : str
-        Name of imported dem file
-    dem: str or Path obj
-        original DEM used
-    search: int
-        Outer search radius. Default=3
-    skip: int
-        Inner search radius. Default=0
-    flat: float
-        Flatness threshold in degrees. Default=1
-    dist: float
-        Default=0
-
-    Returns
-    -------
-    dict
-    """
-
-    prj = in_raster.split('_')[0]
-    num = in_raster[-2:]
-
-    out_raster = '{}_GEOM{}'.format(prj, num)
-
-    gscript.core.run_command('r.geomorphon', elevation=str(in_raster)+"@PERMANENT", forms=out_raster, search=search, skip=skip, flat=flat, dist=dist, overwrite=True)
-
-    g_ras = out_raster.replace("forms", "g")
-
-
-    # TODO: Any reclassification or conversion needed for geomorphons file
-
-
-
-
-    g_path = export_raster_00(g_ras, 'Surface_Flow', 'SFW', 'GEOM', str(dem))
-    return g_path
-
-
-def export_raster_00(in_raster, class_name, group_str, name, dem_path):
-    """Export GRASS rasters to .tif files
-
-    Parameters
-    ----------
-    in_raster : str
-        Name of GRASS raster to export
-    class_name : str
-        Name of class, example: "Surface_Flow"
-    group_str : str
-        Group prefix, example: "SFW"
-    name : str
-        Model file abbreviation, example: "P"
-    dem_path : str
-        Path to DEM
-    """
     from pathlib import Path
 
+    import grass.script as gscript
+
     dem = Path(str(dem_path))
-    dsm = dem.parent
-    prj = dsm.parent.parent
+    name_parts = dem.stem.split('_')
+    prj = name_parts[0]
+    dem_ras = '_'.join(name_parts[0:2])
+    dem_num = dem_ras[-2:]
 
-    huc = dem.stem.split('_')[0]
+    # Import the DEM and set region extent and projection to match it
+    map_rasters = gscript.list_strings(type='raster')
+    if dem_ras not in map_rasters:
+        gscript.run_command('r.in.gdal', input=str(dem_path), output=dem_ras, verbose=True)
+    gscript.run_command('g.region', raster=dem_ras, verbose=True)
 
-    class_path = prj / class_name
+    forms = '{p}_forms{n}'.format(p=prj, n=dem_num)
+    gscript.run_command('r.geomorphon', elevation=str(dem_ras) + "@PERMANENT", forms=forms, **kwargs)
 
-    grps = list(class_path.glob(group_str + '*'))
+    # Reclassify. 10 -> 1:depression, 7 -> 2:hollow, 9 -> 3:valley
+    g_ras = forms.replace('forms', 'geom')
+    expr = "{o} = if({i}==10, 1, if({i}==7, 2, if({i}==9, 3, 0)))".format(o=g_ras, i=forms)
+    gscript.raster.mapcalc(expr, overwrite=True)
 
-    # Find the highest group number
-    if len(grps) > 0:
-        grpnos = []
-        for grp in grps:
-            grpno = grp.name.split("_")[0][-2:]
-            grpnos.append(int(grpno))
-        new_group_no = ('0' + str(max(grpnos) + 1))[-2:]
+    # Export the new file
+    cls = dem.parent.parent.parent / "Surface_Flow"
+    if cls.exists():
+        grps = list(cls.glob('SFW*_DEM'+str(dem_num)))
     else:
-        new_group_no = '00'
-    old_group = dsm.name.split('_')[0]
-    new_group = class_path / "{}{}_{}".format(group_str, new_group_no, old_group)
+        grps = []
+    if len(grps) > 0:
+        sfw = grps[0]
+        sfw_num = sfw.name.split('_')[1][-2:]
+    else:
+        sfw = cls / 'SFW00_DEM'+str(dem_num)
+        sfw_num = '00'
+        sfw.mkdir(parents=True)
 
-    new_group.mkdir(parents=True)
+    out_file = sfw / "{p}_GEOM{g}_DEM{n}.tif".format(p=prj, g=sfw_num, n=dem_num)
 
-    # Export file path
-    out_file_name = "{}_{}{}_{}.tif".format(huc, name, new_group_no,
-                                            dem.name.split("_")[1])
-    out_path = new_group / out_file_name
+    gscript.run_command('r.out.gdal', input=g_ras, output=str(out_file),
+                        format="GTiff", type="Byte",
+                        createopt="COMPRESS=DEFLATE,PREDICTOR=2")
 
-    gscript.run_command('r.out.gdal', input=in_raster, output=out_path,
-                        format="GTiff", type="Int16",
-                        createopt="COMPRESS=LZW,PREDICTOR=2,BIGTIFF=YES",
-                        nodata=-32768)
-    return str(out_path)
-
-
-##################################
-# Combined functions
-##################################
-
-def dem_to_geom_00(dem_path, search=3, skip=0, flat=1, dist=0):  #TODO
-    """Run import, geomorph, mapcalc, and export tools
-
-    Parameters
-    ----------
-    dem_path : str or object
-        Path to DEM file
-
-    Returns
-    -------
-    output_paths : dict
-        Paths to exported files
-    """
-
-    # Import dem
-    elev_raster = import_dem_00(str(dem_path))
-
-    # Run r.geomorphon
-    g = geomorphon_00(str(elev_raster), dem_path, search, skip, flat, dist)
-
-    return {'geom': g}
+    return out_file
 
 
 def main():
@@ -180,13 +130,28 @@ def main():
     To run from outside GRASS, use `gr_external_00.geomorphon_ext_00`.
     """
 
-    options, flags = gscript.parser()
-    dem_path = options['dem']
+    dem = options['dem']
+    search = options['search']
+    skip = options['skip']
+    flat = options['flat']
+    dist = options['dist']
 
-    dem_to_geom_00(dem_path)
+    # Set values for optional params
+    kwargs = {}
+    if search:
+        kwargs['search'] = search
+    if skip:
+        kwargs['skip'] = skip
+    if flat:
+        kwargs['flat'] = flat
+    if dist:
+        kwargs['dist'] = dist
+
+    geomorphon_00(dem, **kwargs)
 
     return 0
 
 
 if __name__ == "__main__":
+    options, flags = gscript.parser()
     sys.exit(main())
