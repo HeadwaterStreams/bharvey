@@ -1,35 +1,35 @@
-#! python3
+#!/usr/bin/env python3
 """
-Creates hydro-enforced DEMs
+Creates hydro-enforced DEMs using WhiteboxTools
 
 From initial DEM and culvert shapefiles, creates 3 new DSM groups:
-- DEM with culverts
-- DEM with breached depressions
-- DEM with culverts and breached depressions
+1. DEM with culverts burned in
+2. DEM with breached depressions
+3. DEM with culverts and breached depressions
 
 Usage
------------
-To create all DSM groups for 20ft resolution, on the first run, use
-process_dems_first_00([pipe files], dem_path).
+------
+If you're working with multiple resolutions, start with your lowest resolution DEM (probably 20ft).
+Use `process_dems_first_00`. This will create the next 3 DSM groups. It will also create a
+rasterized pipe zones file (PIPR), which you can re-use with higher-resolution DEMs.
 
-If you have a rasterized pipe zones file, use process_dems_00(pipe_zones_path,
-dem_path).
+If you already have a PIPR file for the basin, you can just run process_dems_00(pipe_zones_path, dem_path).
 
-Updated: 2020-04-07
+Updated: 2020-07-15
 """
 
 
 def new_group_00(source_path):
-    """ Creates the next group in the input file's class
+    """Creates the next group in the input file's class
 
     Parameters
     ----------
-    source_path : str
+    source_path: str
         Path to source file
 
     Returns
-    -------
-    out_grp_path : str
+    --------
+    out_grp_path: str
     """
     
     import os
@@ -68,23 +68,21 @@ def new_group_00(source_path):
 
 def new_group_01(folder_path, source, name=None):
     """Creates the next group in the folder
-    
+
     Parameters
     ----------
-    folder_path : str or path object
-        Path to parent folder. Example: r'D:\...\Basins\CHOWN05\Surface'
-        It does not have to exist.
-    source : str
+    folder_path: str
+        Path to parent folder. Example: r'D:...BasinsCHOWN05Surface' It does not have to exist.
+    source: str
         Name substring for the source file or folder. Example: 'DEM00'
-    name : str, optional
+    name: str, optional
         Name substring for the new group. Example: 'DSM'
         Only needed if there are no existing groups in the parent folder.
 
     Returns
     -------
-    new_group : str
+    new_group: str
     """
-
     from pathlib import Path
     
     folder = Path(str(folder_path))
@@ -108,17 +106,18 @@ def new_group_01(folder_path, source, name=None):
 
 
 def new_file_00(in_file_path, name, out_ext, out_grp_path=None):
-    """ Creates a name and path for a new file from the input file name and group.
+    """Creates a name and path for a new file from the input file name and
+    group.
 
     Parameters
     ----------
-    in_file_path: str or path object
+    in_file_path: str
         Path to input file
     name: str
         Example: "DEM"
     out_ext: str
         File extension for the output file. Example: "shp"
-    out_grp_path: str or path object, optional
+    out_grp_path: str, optional
         Path to output directory. If none given, uses input directory.
 
     Returns
@@ -163,15 +162,15 @@ def clip_pipes_00(in_pipe_path, dem_path):
     """Clips a statewide culvert shapefile to the extent of a raster file.
 
     Parameters
-    ----------
-    in_pipe_path : string
+    -----------
+    in_pipe_path: str
         Path to full culvert file
-    dem_path : str
+    dem_path: str
         Path to DEM .tif file
 
     Returns
     -------
-    out_file : str
+    out_file: str
     """
     
     from pathlib import Path
@@ -201,24 +200,22 @@ def clip_pipes_00(in_pipe_path, dem_path):
 
 
 def merge_pipes_00(in_pipe_paths):
-    """ Merges culvert features from multiple files.
+    """Merges culvert features from multiple files.
 
     The merged culvert file will be saved in a new Hydro_Route group.
-    
+
     Parameters
     ----------
-    in_pipe_paths : list of str
-        List of pipe files to merge. Pipe files should already be clipped to
-        basin extent. (If not, run extract_pipes_00 first.)
-        
+    in_pipe_paths: list of str
+        List of pipe files to merge. Pipe files should already be clipped to basin extent. (If not, run extract_pipes_00 first.)
+
     Returns
-    -------
-    output_path : str
+    --------
+    output_path: str
     """
     from pathlib import Path
     
     from WBT.whitebox_tools import WhiteboxTools
-    
     wbt = WhiteboxTools()
     
     last_pipe = Path(in_pipe_paths[-1])
@@ -234,20 +231,22 @@ def merge_pipes_00(in_pipe_paths):
 
 
 def extend_pipes_00(in_pipe_path, dist='20.0'):
-    """ Extends individual culvert lines at each end.
+    """Extends individual culvert lines at each end.
 
-    The culvert lines in the original files don't always extend across the road fill area on the DEM.
+    The culvert lines in the original files don't always extend across the
+    road fill area on the DEM.
 
     Parameters
-    ----------
-    in_pipe_path : str
+    -----------
+    in_pipe_path: str
         Path to pipe file.
-    dist : str, optional
+    dist: str, optional
         Distance to extend each line in both directions.
 
     Returns
     -------
-    output_path : str
+    output_path: str
+
     """
     from WBT.whitebox_tools import WhiteboxTools
     
@@ -266,18 +265,17 @@ def pipes_to_raster_00(in_pipe_path, in_dem_path):
 
     Parameters
     ----------
-    in_pipe_path : str
+    in_pipe_path: str
         Path to the pipe file to buffer
-    in_dem_path : str
+    in_dem_path: str
         Path to the base DEM
 
     Returns
-    -------
-    output_path : str
+    --------
+    output_path: str
     """
     
     from WBT.whitebox_tools import WhiteboxTools
-    
     wbt = WhiteboxTools()
     
     # Create pipe raster file
@@ -290,18 +288,18 @@ def pipes_to_raster_00(in_pipe_path, in_dem_path):
 
 
 def zone_min_00(in_dem_path, in_zones_path):
-    """ Set cells in culvert zones to the min elevation for the zone.
+    """Set cells in culvert zones to the min elevation for the zone.
 
     Parameters
-    ----------
-    in_dem_path : str
+    -----------
+    in_dem_path: str
         Path to input DEM file
-    in_zones_path : str
+    in_zones_path: str
         Path to culvert raster file
 
     Returns
     -------
-    output_path : str
+    output_path: str
     """
     from WBT.whitebox_tools import WhiteboxTools
     wbt = WhiteboxTools()
@@ -320,19 +318,18 @@ def burn_min_00(in_dem_path, in_zones_path):
     original DEM file everywhere else.
 
     Parameters
-    ----------
-    in_dem_path : str
+    -----------
+    in_dem_path: str
         Path to the DEM input file
-    in_zones_path : str
+    in_zones_path: str
         Path to raster file resulting from zonal statistics minimum tool
 
     Returns
     -------
-    output_path : str
+    output_path: str
     """
     
     from WBT.whitebox_tools import WhiteboxTools
-    
     wbt = WhiteboxTools()
     
     out_group = new_group_00(in_dem_path)
@@ -357,18 +354,17 @@ def breach_depressions_00(in_dem_path, breach_dist='20'):
 
     Parameters
     ----------
-    in_dem_path : str
+    in_dem_path: str
         Path to the DEM
-    breach_dist : str, optional
+    breach_dist: str, optional
         Search radius
 
     Returns
-    -------
-    output_path : str
+    --------
+    output_path: str
     """
     
     from WBT.whitebox_tools import WhiteboxTools
-    
     wbt = WhiteboxTools()
     
     out_group = new_group_00(in_dem_path)
@@ -381,29 +377,21 @@ def breach_depressions_00(in_dem_path, breach_dist='20'):
     return output_path
 
 
-
-
-
-# ==========================
-# === Combined functions ===
-
-
 def process_culverts_00(culvert_paths, in_dem_path, extend_dist='20'):
-    """
-    
+    """Creates a pipe zones raster file from a list of culvert shapefiles
+
     Parameters
     ----------
-    culvert_paths : list
-        Paths to culvert files. This should work with shapefiles either
-        statewide or extracted to the basin.
-    in_dem_path : str
+    culvert_paths: list of str
+        Paths to culvert files. Can be statewide shapefiles or those already clipped to the basin extent.
+    in_dem_path: str
         Path to first DEM file
-    extend_dist : str, optional
-        Distance to extend pipes from each end
-        
+    extend_dist: str, optional
+        Distance to extend pipes from each end, in feet
+
     Returns
-    -------
-    pipe_raster : str
+    --------
+    pipe_raster: str
         Path to raster created from clipped, merged pipe files
     """
     from pathlib import Path
@@ -428,29 +416,27 @@ def process_culverts_00(culvert_paths, in_dem_path, extend_dist='20'):
 def process_dems_00(pipe_zones_path, in_dem_path, breach_dist='50'):
     """Creates 3 new DSM groups from initial DEM and pipe zones raster.
 
-    If you already have the pipe zones file from the first run, start here.
-    If not, run `process_dems_first_00` on the 20-ft resolution DEM first.
+    If you already have a PIPR file for the basin, you can start here. If
+    not, run `process_dems_first_00` .
 
     For example, from DEM00, the following groups will be created:
-    DSM01_DEM00: Burn in culverts
-    DSM02_DEM00: Breach depressions
-    DSM03_DEM01: Burn in culverts, then breach depressions
-    
+    DSM01_DEM00: Burn in culverts DSM02_DEM00: Breach depressions DSM03_DEM01:
+    Burn in culverts, then breach depressions
+
     Parameters
-    ----------
-    pipe_zones_path : str
+    -----------
+    pipe_zones_path: str
         Path to pipe zone .tif file (created from first run)
-    in_dem_path : str
+    in_dem_path: str
         Path to initial DEM file
-    breach_dist : str, optional
+    breach_dist: str, optional
         Maximum distance to breach depressions
 
     Returns
     -------
-    dems : list of str
+    dems: list of str
         List of paths to DEM files (useful if called from another script)
     """
-    
     dems = [in_dem_path]
     
     # Add culverts to DEM
@@ -472,25 +458,25 @@ def process_dems_00(pipe_zones_path, in_dem_path, breach_dist='50'):
 def process_dems_first_00(culvert_paths, in_dem_path, extend_dist='20',
                           breach_dist='50'):
     """Creates the next 3 DEMs from the initial DEM and pipe shapefiles.
-    
+
     You only need to run this once, preferably using a 20ft resolution DEM.
-    If you already have a culvert raster file for the basin,
-    use `process_dems_00` instead.
+    If you already have a culvert raster file for the basin, use
+    `process_dems_00` instead.
 
     Parameters
     ----------
-    culvert_paths : list
+    culvert_paths: list
         List of paths to culvert .shp files
-    in_dem_path : str
+    in_dem_path: str
         Path to initial DEM
-    extend_dist : str
+    extend_dist: str
         Distance in feet to extend culvert lines from each end
-    breach_dist : str, optional
+    breach_dist: str, optional
         Max breach distance, in feet
 
     Returns
     -------
-    dems : list of str
+    dems: list of str
         List of paths to DEM files (useful if called from another script)
     """
     
