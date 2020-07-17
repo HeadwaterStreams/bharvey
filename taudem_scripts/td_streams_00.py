@@ -1,4 +1,4 @@
-#! python3
+#!/usr/bin/env python3
 """ Runs TauDEM tools
 
 Usage
@@ -7,12 +7,16 @@ To create the initial sfw group, run `dem_to_sfw_00`.
 
 To create a stream network group from the files created using the GRASS r.watershed tool, run `watershed_to_snet_00`
 
-TODO:
-    * Add paths of new files to a dictionary or class for use with batch functions
 """
 
 
 def td_cmd_00(tool_args):
+    """
+
+    Parameters
+    ----------
+    tool_args: list
+    """
 
     import subprocess
 
@@ -167,6 +171,26 @@ def dem_to_sfw_00(dem_path):
     return out_paths
 
 
+def p_to_sfw_00(p):
+    """Starting with a pointer file, creates the rest of the SFW group.
+
+    Use this on the P file exported by `gr_watershed_00`
+
+    Parameters
+    ----------
+    p
+
+    Returns
+    -------
+
+    """
+
+    d8 = area_d8_00(p)
+    out_paths = grid_net_00(p)
+    out_paths.update(p=p, d8=d8)
+    return out_paths
+
+
 # ==========================================
 #! Not done testing anything below this line
 
@@ -221,6 +245,7 @@ def stream_net_00(fel_path, p_path, ad8_path, src_path):
     Parameters
     ----------
     fel_path : str
+        If r.watershed was used to create the P file, use the DEM instead.
     p_path : str
     ad8_path : str
     src_path : str
