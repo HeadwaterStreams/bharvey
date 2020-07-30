@@ -50,9 +50,9 @@ def pit_remove_00(dem_path):
     td_args.extend(["-fel", str(fel)])
 
     td_cmd_00(td_args)
-    
+
     return fel
-    
+
 
 def flow_dir_00(fel_path):
     """Creates pointer and slope files.
@@ -72,7 +72,7 @@ def flow_dir_00(fel_path):
     td_args = ["D8FlowDir"]
     fel = Path(str(fel_path))
     p_name = fel.name.replace("FEL", "P").replace("DEM", "FEL")
-    s_name = fel.name.replace("FEL", "D8SLP").replace("DEM", "FEL")    
+    s_name = fel.name.replace("FEL", "D8SLP").replace("DEM", "FEL")
     p = fel.parent.joinpath(p_name)
     slp = fel.parent.joinpath(s_name)
 
@@ -81,7 +81,7 @@ def flow_dir_00(fel_path):
 
     return p
 
- 
+
 def area_d8_00(p_path):
     """Creates D8 Area file.
 
@@ -99,15 +99,15 @@ def area_d8_00(p_path):
 
     td_args = ["AreaD8"]
     p = Path(str(p_path))
-    d8_name = p.name.replace("P", "D8AREA").replace("FEL", "P")    
+    d8_name = p.name.replace("P", "D8AREA").replace("FEL", "P")
     d8 = p.parent / d8_name
 
     td_args.extend(["-p", str(p_path), "-ad8", str(d8)])
     td_cmd_00(td_args)
 
     return d8
-    
-    
+
+
 def grid_net_00(p_path):
     """
 
@@ -153,6 +153,8 @@ def grid_net_00(p_path):
 def dem_to_sfw_00(dem_path):
     """Create SFW group with all TauDEM results.
 
+    Use this to create the first set of SFW groups.
+
     Parameters
     ----------
     dem_path: str
@@ -174,7 +176,11 @@ def dem_to_sfw_00(dem_path):
 def p_to_sfw_00(p):
     """Starting with a pointer file, creates the rest of the SFW group.
 
-    Use this on the P file exported by `gr_watershed_00`
+    Use this on the P file exported by `gr_watershed_00`.
+
+    Note
+    ----
+    This does not create an FEL file. When you run `stream_net_00` or another script with the parameter `fel`, enter the DEM path instead.
 
     Parameters
     ----------
@@ -207,7 +213,7 @@ def threshold_00(ssa_path, threshold):
         - GORD
     threshold : int
         If running with FWINVPLAN, try 5 for 20ft resolution, 60 for 10ft, 500 for 5ft.
-        If running with ORD, 3 usually works.
+        If running with ORD, 5 usually works.
         If running with D8AREA, default is 100
 
     Returns
@@ -245,7 +251,7 @@ def stream_net_00(fel_path, p_path, ad8_path, src_path):
     Parameters
     ----------
     fel_path : str
-        If r.watershed was used to create the P file, use the DEM instead.
+        If r.watershed was used to create the P and/or SRC files, use the DEM here instead of the FEL.
     p_path : str
     ad8_path : str
     src_path : str

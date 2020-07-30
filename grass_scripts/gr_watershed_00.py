@@ -3,13 +3,13 @@
 #
 # MODULE:     gr_watershed_00
 # AUTHOR(S):  bharvey2
-# PURPOSE:    Run r.watershed and convert the resulting files to use with TauDEM
-# DATE:       2020-04-27
+# PURPOSE:    Run r.watershed and exports the flow direction file to use with TauDEM
+# DATE:       2020-07-06
 #
 #################################################################################
 
 #%module
-#% description: Runs r.watershed and exports SRC and P files
+#% description: Runs r.watershed and exports flow direction file
 #% keyword: raster
 #% keyword: hydrology
 #% keyword: watershed
@@ -26,6 +26,7 @@
 #% description: Depends on resolution. Ex: 20ft: 100, 10ft: 500, 5ft: 1200
 #% multiple: no
 #% required: yes
+#% answer: 160
 #%end
 
 import sys
@@ -59,15 +60,14 @@ def import_dem_00(dem_path):
 
 
 def watershed_00(in_raster_name, threshold):
-    """Run r.watershed
+    """Runs r.watershed.
 
     Parameters
     ----------
     in_raster_name : str
         Name of imported dem file
     threshold : int
-        Minimum size, in map cells, of individual watersheds. If
-        not specified, choose based on resolution.
+        Minimum size, in map cells, of individual watersheds.
 
     Returns
     -------
@@ -97,13 +97,18 @@ def watershed_00(in_raster_name, threshold):
 
 
 def drain_to_p_00(drain, dem):
-    """Convert a drainage direction raster to P file
+    """Converts a drainage direction raster to a .tif file for use with TauDEM.
 
     Parameters
     ----------
     drain : str
         Name of GRASS drainage direction raster
     dem : str
+    
+    Returns
+    -------
+    p_path: str
+        Path to exported file.
     """
 
     p_ras = drain.replace("drain", "p")
@@ -119,7 +124,7 @@ def drain_to_p_00(drain, dem):
 
 
 def stream_to_src_00(stream, dem):
-    """Convert a stream segments raster to SRC file
+    """Converts a stream segment raster to a SRC file
 
     Parameters
     ----------
@@ -141,7 +146,7 @@ def stream_to_src_00(stream, dem):
 
 
 def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
-    """Export GRASS rasters to .tif files
+    """Exports a GRASS raster to a .tif file and saves it to a new group.
 
     Parameters
     ----------
@@ -150,12 +155,18 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
     group_parent_name : str
         Name of class, example: "Surface_Flow"
     group_str : str
-        Group prefix, example: "SFW"
+        Group name, example: "SFW"
     name : str
         Model file abbreviation, example: "P"
     dem_path : str
         Path to DEM
+        
+    Returns
+    -------
+    out_path: str
+        Path to exported .tif file
     """
+    
     from pathlib import Path
 
     dem = Path(str(dem_path))
@@ -219,19 +230,22 @@ def dem_to_src_00(dem_path, threshold):
 
     # Run r.watershed
     watershed_rasters = watershed_00(str(elev_raster), threshold)
-    stream = watershed_rasters['stream']
-    drain = watershed_rasters['drainage']
+    
+    
 
     # Reclassify and export GRASS rasters for use with TauDEM
+    drain = watershed_rasters['drainage']
+    p = drain_to_p_00(drain, dem_path)    
+    
+    stream = watershed_rasters['stream']
     src = stream_to_src_00(stream, dem_path)
 
-    p = drain_to_p_00(drain, dem_path)
-
     return {'src': src, 'p': p}
+    # return {'p': p}
 
 
 def main():
-    """Imports the DEM, runs r.watershed, and exports SRC and P files
+    """Imports the DEM, runs r.watershed, and exports flow direction file.
 
     Must be run from within the GRASS user interface.
     To run from outside GRASS, use watershed_ext_00() or watershed_batch_00().
@@ -244,7 +258,7 @@ def main():
     dem_to_src_00(dem_path, threshold)
 
     return 0
-
+    #TODO: Return paths to new files.
 
 if __name__ == "__main__":
     sys.exit(main())

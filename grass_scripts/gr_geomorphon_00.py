@@ -2,7 +2,7 @@
 #################################################################################
 #
 # MODULE:     gr_geomorphon_00
-# AUTHOR(S):  bharvey2
+# AUTHOR(S):  bethany.harvey@ncdenr.gov
 # PURPOSE:    Runs r.geomorphon and exports a file with valleys, hollows, and depressions
 # DATE:       2020-07-06
 #
@@ -53,7 +53,7 @@
 #%end
 
 
-# TODO: Test from gr_external_00
+# TEST: Works from GRASS, test from `gr_external_00`
 
 import sys
 

@@ -9,7 +9,7 @@ From initial DEM and culvert shapefiles, creates 3 new DSM groups:
 
 Usage
 ------
-If you're working with multiple resolutions, start with your lowest resolution DEM (probably 20ft).
+If you're working with multiple resolutions, start with a DEM with the lowest resolution (probably 20ft).
 Use `process_dems_first_00`. This will create the next 3 DSM groups. It will also create a
 rasterized pipe zones file (PIPR), which you can re-use with higher-resolution DEMs.
 
@@ -31,7 +31,6 @@ def new_group_00(source_path):
     --------
     out_grp_path: str
     """
-    
     import os
     import re
     
@@ -372,7 +371,7 @@ def breach_depressions_00(in_dem_path, breach_dist='20'):
     
     wbt.breach_depressions_least_cost(in_dem_path, output_path, breach_dist,
                                       fill=True)
-    # TODO: add max_cost parameter for DEMs with quarries
+    # TODO: Add max_cost parameter for DEMs with quarries?
     
     return output_path
 
