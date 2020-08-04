@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-#################################################################################
+# #####################################################################################################################
 #
 # MODULE:     gr_watershed_00
 # AUTHOR(S):  bharvey2
-# PURPOSE:    Run r.watershed and exports the flow direction file to use with TauDEM
+# PURPOSE:    Imports DEM, runs r.watershed, and exports the flow direction and stream segments rasters as .tif files.
 # DATE:       2020-07-06
 #
-#################################################################################
+# #####################################################################################################################
 
 #%module
 #% description: Runs r.watershed and exports flow direction file
@@ -23,7 +23,7 @@
 #% key: threshold
 #% type: integer
 #% label: Minimum size of exterior watershed basins, in cells.
-#% description: Depends on resolution. Ex: 20ft: 100, 10ft: 500, 5ft: 1200
+#% description: Depends on resolution. Ex: 20ft: 160, 10ft: 600, 5ft: 1200
 #% multiple: no
 #% required: yes
 #% answer: 160
@@ -36,7 +36,7 @@ import grass.script as gscript
 
 
 def import_dem_00(dem_path):
-    """Import the DEM as a GRASS raster and set the region to match it
+    """Imports the DEM as a GRASS raster and sets the region to match it.
 
     Parameters
     ----------
@@ -52,8 +52,7 @@ def import_dem_00(dem_path):
     name_parts = Path(str(dem_path)).name.split('_')
     dem_ras = '_'.join(name_parts[0:2])
 
-    gscript.run_command('r.in.gdal', input=str(dem_path), output=dem_ras, overwrite=True, verbose=True)  #TODO: Instead of overwrite, check if it has already been imported.
-
+    gscript.run_command('r.in.gdal', input=str(dem_path), output=dem_ras, overwrite=True, verbose=True)
     gscript.run_command('g.region', raster=dem_ras, verbose=True)
 
     return dem_ras
@@ -102,12 +101,13 @@ def drain_to_p_00(drain, dem):
     Parameters
     ----------
     drain : str
-        Name of GRASS drainage direction raster
+        Name of GRASS drainage direction raster.
     dem : str
+        Path to input DEM.
     
     Returns
     -------
-    p_path: str
+    p_path : str
         Path to exported file.
     """
 
@@ -163,7 +163,7 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
         
     Returns
     -------
-    out_path: str
+    out_path : str
         Path to exported .tif file
     """
     
@@ -172,9 +172,7 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
     dem = Path(str(dem_path))
     dsm = dem.parent
     prj = dsm.parent.parent
-
     huc = dem.stem.split('_')[0]
-
     group_parent_path = prj / group_parent_name
 
     grps = list(group_parent_path.glob(group_str + '*'))
@@ -205,12 +203,8 @@ def export_raster_00(in_raster, group_parent_name, group_str, name, dem_path):
     return str(out_path)
 
 
-##################################
-# Combined functions
-##################################
-
 def dem_to_src_00(dem_path, threshold):
-    """Run import, watershed, mapcalc, and export tools
+    """Runs import, watershed, mapcalc, and export tools
 
     Parameters
     ----------
@@ -230,8 +224,6 @@ def dem_to_src_00(dem_path, threshold):
 
     # Run r.watershed
     watershed_rasters = watershed_00(str(elev_raster), threshold)
-    
-    
 
     # Reclassify and export GRASS rasters for use with TauDEM
     drain = watershed_rasters['drainage']
@@ -241,7 +233,6 @@ def dem_to_src_00(dem_path, threshold):
     src = stream_to_src_00(stream, dem_path)
 
     return {'src': src, 'p': p}
-    # return {'p': p}
 
 
 def main():
@@ -258,7 +249,7 @@ def main():
     dem_to_src_00(dem_path, threshold)
 
     return 0
-    #TODO: Return paths to new files.
+
 
 if __name__ == "__main__":
     sys.exit(main())
