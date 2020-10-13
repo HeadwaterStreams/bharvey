@@ -23,7 +23,7 @@
 #% key: threshold
 #% type: integer
 #% label: Minimum size of exterior watershed basins, in cells.
-#% description: Depends on resolution. Ex: 20ft: 160, 10ft: 600, 5ft: 1200
+#% description: Depends on resolution. Ex: 20ft: 400, 10ft: 1600, 5ft: 6400
 #% multiple: no
 #% required: yes
 #% answer: 160
